@@ -1,0 +1,114 @@
+# config.yaml
+
+
+global_constants: # Global Constants for Hartree to eV conversion factor, atomization energy calculation and heavy atom filtering
+  har2ev: 27.211386245988
+
+atomic_energies_hartree:
+  # Atomic energies in Hartree for common heavy atoms (and Hydrogen)
+  1: -0.5012728848846926  # H
+  6: -37.83859584856468   # C
+  7: -54.5760607136932450 # N
+  8: -75.0474818911551438 # O
+  9: -99.7031524437270917 # F
+  17: -460.13960793480203 # Cl
+  15: -341.2510291850040858 # P
+  35: -2574.01253635198464 # Br
+  16: -398.1021030909759020 # S
+  14: -289.3578409507016431 # Si
+
+heavy_atom_symbols_to_z:
+  # Mapping from common heavy atom symbols to their atomic numbers
+  C: 6
+  N: 7
+  O: 8
+  F: 9
+  Cl: 17
+  P: 15
+  Br: 35
+  S: 16
+  Si: 14
+
+# Dataset Configuration: Defines which properties to include in the PyG Data object
+data_config:
+  # Scalar graph-level targets to be included in pyg_data.y
+  scalar_graph_targets_to_include:
+    - Etot
+    - U0
+    - zpves
+    - gap
+    - Eee
+    - Exc
+    - Edisp
+  # Node-level features to be added to pyg_data.x
+  node_features_to_add:
+    - Qmulliken
+    - Vesp
+  # Fixed-size vector graph properties to be added as separate attributes
+  vector_graph_properties_to_include:
+    - dipole
+    - quadrupole
+    - octupole
+    - hexadecapole
+    - rots
+  # Variable-length graph properties to be added as separate attributes (handled as lists of tensors)
+  variable_len_graph_properties_to_include:
+    - freqs
+    - vibmodes
+  # The key from which to calculate atomization energy (e.g., 'Etot')
+  calculate_atomization_energy_from: Etot
+  # The name of the key for the calculated atomization energy (will be appended to pyg_data.y)
+  atomization_energy_key_name: Etot_ATOM
+
+  test_molecule_limit: 100 # Set to a specific number to limit processing for testing, or null/remove for full dataset
+
+# Dataset Filtering Configuration: Defines criteria for filtering molecules
+filter_config: {}
+  # Maximum number of atoms allowed in a molecule
+  # max_atoms: 200
+  # Minimum number of atoms allowed in a molecule
+  # min_atoms: 3 # Uncomment and set if needed
+
+  # Heavy atom filter:
+  # mode: 'include' - only include molecules with specified heavy atoms
+  # mode: 'exclude' - exclude molecules with specified heavy atoms
+  # atoms: list of atom symbols (e.g., ['C', 'N'])
+
+  # Example 1: Exclude molecules containing Bromine or Chlorine
+  # heavy_atom_filter:
+  #   mode: exclude
+  #   atoms:
+  #     - Br
+  #     - Cl
+
+  # Example 2: Only include molecules that contain ONLY Carbon, Nitrogen, Oxygen, and Fluorine as heavy atoms
+  # (meaning no P, S, Si, Cl, Br, etc.)
+  # heavy_atom_filter:
+  #   mode: include
+  #   atoms:
+  #     - C
+  #     - N
+  #     - O
+  #     - F
+
+  # Example 3 (Active): Exclude molecules containing Silicon
+  # heavy_atom_filter:
+  #   mode: exclude
+  #   atoms:
+  #     - Br
+
+# PyTorch Geometric Transformations Configuration
+# These transformations will be applied as 'pre_transform' during dataset processing.
+# Ensure that the 'name' matches a valid PyG transform class name.
+# Any additional key-value pairs will be passed as arguments to the transform's constructor.
+transformations:
+  - name: OneHotDegree
+    kwargs:
+        max_degree: 5
+    # You might want to specify `in_degree` if it's an option for your version/needs.
+    # in_degree: True # Example parameter
+  - name: NormalizeFeatures
+    kwargs: {}
+  # Example of another transform (uncomment if you want to include it):
+  # - name: Distance
+  #   norm: False
