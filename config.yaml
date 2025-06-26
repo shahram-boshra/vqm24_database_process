@@ -7,7 +7,7 @@ global_constants: # Global Constants for Hartree to eV conversion factor, atomiz
 atomic_energies_hartree:
   # Atomic energies in Hartree for common heavy atoms (and Hydrogen)
   1: -0.5012728848846926  # H
-  6: -37.83859584856468   # C
+  6: -37.83859584856468    # C
   7: -54.5760607136932450 # N
   8: -75.0474818911551438 # O
   9: -99.7031524437270917 # F
@@ -29,6 +29,21 @@ heavy_atom_symbols_to_z:
   S: 16
   Si: 14
 
+# --- SECTION FOR STRUCTURAL FEATURES ---
+structural_features:
+  atom:
+    - degree
+    - total_degree
+    - hybridization
+    - total_valence
+    - is_aromatic
+    - is_in_ring
+  bond:
+    - bond_type
+    - is_conjugated
+    - is_aromatic
+    - is_in_any_ring
+
 # Dataset Configuration: Defines which properties to include in the PyG Data object
 data_config:
   # Scalar graph-level targets to be included in pyg_data.y
@@ -41,7 +56,7 @@ data_config:
     - Exc
     - Edisp
   # Node-level features to be added to pyg_data.x
-  node_features_to_add:
+  node_features_to_add: # NOTE: These are likely *additional* node features, e.g. from raw_properties_dict. Our structural features go into pyg_data.x by default.
     - Qmulliken
     - Vesp
   # Fixed-size vector graph properties to be added as separate attributes

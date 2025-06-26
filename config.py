@@ -1,5 +1,3 @@
-# config.py 
-
 """
 This module handles the loading and access of application configuration settings
 from a YAML file.
@@ -27,7 +25,7 @@ def load_config(config_path: str = 'config.yaml') -> Dict[str, Any]:
 
     Args:
         config_path (str): The path to the YAML configuration file.
-                           Defaults to 'config.yaml'.
+                            Defaults to 'config.yaml'.
 
     Returns:
         dict: A dictionary containing the loaded configuration.
@@ -38,18 +36,18 @@ def load_config(config_path: str = 'config.yaml') -> Dict[str, Any]:
     """
     global _CONFIG
     if _CONFIG is None: # Load only once
+        # (Optional: You can keep or remove this line, as it doesn't seem to be showing up for you)
+        # print(f"DEBUG: Attempting to load config from: {os.path.abspath(config_path)}")
+
         if not os.path.exists(config_path):
-            # NEW: Raise ConfigurationError for file not found
             raise ConfigurationError(f"Configuration file not found at: {config_path}", config_key="config_path", actual_value=config_path)
 
         try:
             with open(config_path, 'r') as f:
                 _CONFIG = yaml.safe_load(f)
         except yaml.YAMLError as e:
-            # NEW: Catch YAML parsing errors and re-raise as ConfigurationError
             raise ConfigurationError(f"Error parsing configuration file: {e}", config_key="config_file", actual_value=config_path) from e
         except Exception as e:
-            # NEW: Catch any other unexpected errors during file reading/loading
             raise ConfigurationError(f"An unexpected error occurred while loading config: {e}", config_key="config_file", actual_value=config_path) from e
     return _CONFIG
 
@@ -71,7 +69,7 @@ def _get_config_value(config_dict: Dict[str, Any], key: str, expected_type: Opti
 
     Raises:
         ConfigurationError: If the key is missing from the dictionary or
-                            the retrieved value does not match the `expected_type`.
+            the retrieved value does not match the `expected_type`.
     """
     full_key = f"{parent_key}.{key}" if parent_key else key
     if key not in config_dict:
@@ -98,3 +96,4 @@ HEAVY_ATOM_SYMBOLS_TO_Z: Dict[str, int] = _get_config_value(_TEMP_CONFIG, 'heavy
 # Access 'global_constants' dictionary first, then its 'har2ev' key
 global_constants: Dict[str, Any] = _get_config_value(_TEMP_CONFIG, 'global_constants', dict)
 HAR2EV: Union[int, float] = _get_config_value(global_constants, 'har2ev', (int, float), parent_key='global_constants')
+

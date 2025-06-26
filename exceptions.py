@@ -261,4 +261,41 @@ class PropertyEnrichmentError(MoleculeProcessingError):
         if self.property_name:
             msg += f" (Property: {self.property_name})"
         return msg
-    
+
+
+class StructuralFeatureError(MoleculeProcessingError):
+    """
+    Exception raised when an error occurs during the calculation or
+    assignment of structural features (atom or bond features).
+    """
+    def __init__(self, message: str = "Failed to calculate or assign structural features.",
+                 molecule_index: Optional[int] = None,
+                 smiles: Optional[str] = None,
+                 feature_type: Optional[str] = None, # "atom" or "bond"
+                 feature_name: Optional[str] = None, # specific feature name, e.g., "hybridization"
+                 reason: Optional[str] = None,
+                 detail: Optional[str] = None) -> None:
+        """
+        Initializes the StructuralFeatureError.
+
+        Args:
+            message (str): A general message about the structural feature failure.
+            molecule_index (Optional[int]): The index of the molecule.
+            smiles (Optional[str]): The SMILES string of the molecule.
+            feature_type (Optional[str]): The type of feature being processed ("atom" or "bond").
+            feature_name (Optional[str]): The specific feature name that caused the error.
+            reason (Optional[str]): The reason for the structural feature failure.
+            detail (Optional[str]): Specific details about the error.
+        """
+        super().__init__(message=message, molecule_index=molecule_index, smiles=smiles, reason=reason, detail=detail)
+        self.feature_type: Optional[str] = feature_type
+        self.feature_name: Optional[str] = feature_name
+
+    def __str__(self) -> str:
+        msg: str = super().__str__()
+        if self.feature_type:
+            msg += f" (Feature Type: {self.feature_type}"
+            if self.feature_name:
+                msg += f", Feature Name: {self.feature_name}"
+            msg += ")"
+        return msg

@@ -12,11 +12,13 @@ during data conversion and filtering.
 
 import logging
 import os
+import time
 import sys
 import shutil
 from pathlib import Path
 import numpy as np
 import requests
+from requests.exceptions import RequestException
 import torch
 import torch_geometric
 from torch_geometric.data import InMemoryDataset, Data
@@ -31,6 +33,7 @@ from data_utils import _is_value_valid_and_not_nan
 from mol_conversion import MoleculeDataConverter
 from molecule_filters import apply_pre_filters
 from exceptions import (
+    BaseProjectError,
     ConfigurationError,
     DataProcessingError,
     MoleculeProcessingError,
@@ -68,7 +71,7 @@ def _delete_directory_in_background(directory_path_str: str, logger_name: str):
         process_logger.info(f"Background process: Deleting temporary directory: {directory_path}")
         try:
             shutil.rmtree(directory_path)
-            process_logger.info(f"Background process: D_eletion of {directory_path} completed.")
+            process_logger.info(f"Background process: Deletion of {directory_path} completed.")
         except OSError as e:
             process_logger.error(f"Background process: Error deleting {directory_path}: {e}")
     else:
@@ -129,6 +132,7 @@ class VQM24Dataset(InMemoryDataset):
                  npz_file_path: str,
                  data_config: Dict[str, Any],
                  filter_config: Dict[str, Any],
+                 structural_features_config: Dict[str, Any],
                  logger: logging.Logger,
                  chunk_size: int = 5000,
                  transform: Optional[Any] = None, # Type depends on PyG transform
@@ -141,6 +145,7 @@ class VQM24Dataset(InMemoryDataset):
         self.raw_data_filename: str = Path(npz_file_path).name # Store just the filename
         self.data_config: Dict[str, Any] = data_config
         self.filter_config: Dict[str, Any] = filter_config
+        self.structural_features_config: Dict[str, Any] = structural_features_config 
         self.logger: logging.Logger = logger
         self.chunk_size: int = chunk_size
         self.force_reload: bool = force_reload
@@ -301,56 +306,96 @@ class VQM24Dataset(InMemoryDataset):
         """
         return ['data.pt']
 
-    def download(self) -> None:
-        """
-        Downloads the raw VQM24 dataset NPZ file from the specified Zenodo URL.
 
-        The file is saved to the `self.raw_dir` directory. If the file already
-        exists and is non-empty, the download is skipped. A progress bar is shown
-        during the download. Critical failures during download or writing will
-        cause the program to exit.
+    def download_file(
+        url: str,
+        filename: str,
+        raw_dir: str,
+        max_retries: int = 5,
+        retry_delay: int = 5,
+        logger: "logging.Logger" = None
+        ) -> None:
+        """
+        Downloads a file from the specified URL and saves it to the given filename.
+
+        Args:
+            url (str): The URL of the file to download.
+            filename (str): The name of the file to save.
+            raw_dir (str): The directory to save the downloaded file.
+            max_retries (int): The maximum number of retries in case of download failures.
+            retry_delay (int): The initial delay (in seconds) between retries, with exponential backoff.
+            logger (logging.Logger, optional): A logger instance to use for logging messages.
 
         Raises:
-            requests.exceptions.RequestException: If a network or HTTP error occurs during download.
-            IOError: If a disk I/O error occurs while writing the file.
-            SystemExit: If a critical error prevents the download or file writing.
+            RequestException: If the download fails after the maximum number of retries.
+            IOError: If there is an error writing the downloaded data to the file.
+            MissingDependencyError: If the `tqdm` library is not available.
         """
-        # Entire download method rewritten for web download
-        destination_path: Path = Path(self.raw_dir) / self.raw_file_names[0]
+        destination_path: Path = Path(raw_dir) / filename
 
         # Check if file already exists and is not empty
         if destination_path.exists() and destination_path.stat().st_size > 0:
-            self.logger.info(f"Raw NPZ file already exists at {destination_path} and is non-empty. Skipping download.")
+            if logger:
+                logger.info(f"File already exists at {destination_path} and is non-empty. Skipping download.")
             return
 
-        self.logger.info(f"Downloading raw NPZ file from {self.ZENODO_DOWNLOAD_URL} to {destination_path}...")
+        if logger:
+            logger.info(f"Downloading file from {url} to {destination_path}...")
 
-        try:
-            response = requests.get(self.ZENODO_DOWNLOAD_URL, stream=True)
-            response.raise_for_status() # Raise an HTTPError for bad responses (4xx or 5xx)
+        retries = 0
+        downloaded = 0
+        block_size = 65536  # 64 KB
 
-            total_size_in_bytes: int = int(response.headers.get('content-length', 0))
-            block_size: int = 1024 # 1 KB
+        while retries < max_retries:
+            try:
+                headers = {}
+                if os.path.exists(destination_path):
+                    downloaded = os.path.getsize(destination_path)
+                    headers['Range'] = f'bytes={downloaded}-'
 
-            with open(destination_path, 'wb') as file:
-                # Use tqdm for a progress bar
-                with tqdm(total=total_size_in_bytes, unit='iB', unit_scale=True, desc="Downloading") as pbar:
-                    for data in response.iter_content(block_size):
-                        file.write(data)
-                        pbar.update(len(data))
+                with requests.get(url, stream=True, headers=headers) as response:
+                    response.raise_for_status()
+                    total_size_in_bytes = int(response.headers.get('content-length', 0))
 
-            self.logger.info(f"Download complete: {destination_path}")
+                    with open(destination_path, 'ab') as file:
+                        try:
+                            with tqdm(total=total_size_in_bytes, unit='iB', unit_scale=True, desc="Downloading", initial=downloaded) as pbar:
+                                for data in response.iter_content(chunk_size=block_size):
+                                    if data:
+                                        file.write(data)
+                                        downloaded += len(data)
+                                        pbar.update(len(data))
+                        except ModuleNotFoundError:
+                            if logger:
+                                logger.warning("tqdm library not found, progress bar will not be shown.")
+                            with open(destination_path, 'ab') as file:
+                                for data in response.iter_content(chunk_size=block_size):
+                                    if data:
+                                        file.write(data)
+                                        downloaded += len(data)
 
-        except requests.exceptions.RequestException as e:
-            self.logger.critical(f"Failed to download raw NPZ file from {self.ZENODO_DOWNLOAD_URL}. Network or HTTP error: {e}")
-            if destination_path.exists():
-                # Clean up potentially incomplete download
-                os.remove(destination_path)
-                self.logger.info(f"Removed incomplete file: {destination_path}")
-            sys.exit(1) # Exit if download critically fails
-        except IOError as e:
-            self.logger.critical(f"Failed to write downloaded NPZ file to {destination_path}. Disk I/O error: {e}")
-            sys.exit(1) # Exit if writing critically fails
+                    if downloaded >= total_size_in_bytes:
+                        if logger:
+                            logger.info(f"Download complete: {destination_path}")
+                        return
+                    else:
+                        if logger:
+                            logger.warning(f"Download interrupted at {downloaded}/{total_size_in_bytes} bytes. Retrying...")
+
+            except requests.exceptions.RequestException as e:
+                if logger:
+                    logger.error(f"Download error: {e}")
+                retries += 1
+                if retries < max_retries:
+                    if logger:
+                        logger.info(f"Retrying download in {retry_delay} seconds...")
+                    time.sleep(retry_delay)
+                    retry_delay *= 2
+                else:
+                    if logger:
+                        logger.critical(f"Maximum number of retries reached. Unable to download '{filename}'.")
+                    if os.path.exists(destination_path):
+                        os.remove(destination_path)
 
 
     def process(self) -> None:
@@ -436,7 +481,10 @@ class VQM24Dataset(InMemoryDataset):
                 details=f"Original error: {e.__class__.__name__}: {e}"
             ) from e
 
-        converter: MoleculeDataConverter = MoleculeDataConverter(self.logger) # No longer pass preloaded_data here
+        converter: MoleculeDataConverter = MoleculeDataConverter(
+            self.logger,
+            structural_features_config=self.structural_features_config 
+        ) # No longer pass preloaded_data here
 
         current_chunk_data_list: List[Data] = []
         processed_total_count: int = 0

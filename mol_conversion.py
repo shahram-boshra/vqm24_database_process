@@ -1,5 +1,3 @@
-# mol_conversion.py
-
 """
 Module for converting raw molecular data (SMILES, coordinates) into RDKit
 molecules and then into PyTorch Geometric Data objects, enriching them with
@@ -12,8 +10,7 @@ import numpy as np
 from rdkit import Chem
 from rdkit.Chem import AllChem
 from torch_geometric.data import Data
-from typing import Dict, Optional, Union
-
+from typing import Dict, Optional, Union, Any
 
 from exceptions import (
     MoleculeProcessingError,
@@ -23,9 +20,9 @@ from exceptions import (
     MoleculeFilterRejectedError
 )
 
-
 from mol_conversion_utils import create_rdkit_mol, mol_to_pyg_data
 from property_enrichment import enrich_pyg_data_with_properties
+from mol_structural_features import add_structural_features
 
 
 logger = logging.getLogger(__name__)
@@ -39,7 +36,10 @@ class MoleculeDataConverter:
     creation, PyTorch Geometric data object generation, and property enrichment.
     It robustly handles various conversion-related exceptions.
     """
-    def __init__(self, logger: logging.Logger):
+    def __init__(self,
+                 logger: logging.Logger,
+                 structural_features_config: Dict[str, Any] = None): 
+
         """
         Initializes the MoleculeDataConverter with a logger instance.
 
@@ -48,6 +48,8 @@ class MoleculeDataConverter:
                                      logging messages and errors.
         """
         self.logger = logger
+        self.structural_features_config = structural_features_config if structural_features_config is not None else {} 
+
 
     def convert(self,
                 molecule_index: int,
@@ -80,6 +82,9 @@ class MoleculeDataConverter:
                             successful, otherwise `None` if an expected error occurs
                             or the molecule is filtered.
         """
+        # ADDED LINE
+        self.logger.debug(f"Molecule {molecule_index}: Full config received by convert method: {config}")
+
         # Capture the current molecule's SMILES and index for all error contexts
         current_mol_index: int = molecule_index
         current_smiles: str = "N/A (unknown)"
@@ -119,7 +124,7 @@ class MoleculeDataConverter:
             # Pass molecule_index and smiles to the utility function
             # create_rdkit_mol will now raise RDKitConversionError on failure
             rdkit_mol: Chem.Mol = create_rdkit_mol(smiles_str, coordinates, self.logger,
-                                                   molecule_index=current_mol_index, smiles=current_smiles)
+                                                    molecule_index=current_mol_index, smiles=current_smiles)
 
 
             # Pass molecule_index and smiles to the utility function
@@ -127,6 +132,26 @@ class MoleculeDataConverter:
             pyg_data: Data = mol_to_pyg_data(rdkit_mol, self.logger,
                                              molecule_index=current_mol_index, smiles=current_smiles)
 
+            # --- START NEW CODE BLOCK: Add structural features ---
+            # Get the configuration for structural features from the main config
+            structural_features_config = self.structural_features_config
+         
+            if structural_features_config: # Only call if configuration for features exists
+                self.logger.debug(f"Adding structural features for mol index {current_mol_index}, smiles '{current_smiles}'")
+                pyg_data = add_structural_features(
+                    rdkit_mol=rdkit_mol,
+                    pyg_data=pyg_data,
+                    feature_config=structural_features_config,
+                    logger=self.logger,
+                    molecule_index=current_mol_index,
+                    smiles=current_smiles
+                )
+            else:
+                self.logger.info(f"No structural_features configuration found for mol index {current_mol_index}, smiles '{current_smiles}'. Skipping feature addition.")
+                # Ensure x and edge_attr are set to None if no features are added
+                pyg_data.x = None
+                pyg_data.edge_attr = None
+            # --- END NEW CODE BLOCK ---
 
             # Attach smiles and original_mol_idx to pyg_data for better debugging downstream
             pyg_data.smiles = current_smiles
@@ -176,4 +201,3 @@ class MoleculeDataConverter:
                 exc_info=True # Always log traceback for unhandled errors
             )
             return None
-        
