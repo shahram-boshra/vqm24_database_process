@@ -5,13 +5,30 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 
-## Project Description
+# **VQM24 PyTorch Geometric Dataset Processing Pipeline**
+
+
+## **Table of Contents**
+
+* [Project Description](#project-description)
+* [Features](#features)
+* [Installation](#installation)
+* [Usage](#usage)
+* [Example of loading the processed dataset](#example)
+* [Configuration](#configuration)
+* [Project Structure](#project-structure)
+* [Citation](#citation)
+* [Acknowledgements](#acknowledgements)
+* [Badges](#badges)
+
+## **Project Description**
 
 This repository provides a robust and configurable data processing pipeline for the **VQM24 (Virtual Quantum Mechanical Property Prediction)** dataset, designed specifically for use with **PyTorch Geometric (PyG)**. The pipeline handles the entire process from raw data acquisition (downloading from Zenodo) to the generation of fully enriched and filtered `torch_geometric.data.Data` objects, ready for graph neural network (GNN) applications.
 
 It leverages RDKit for comprehensive molecular structural feature extraction and integrates various quantum chemical properties. The modular design, extensive configuration options via `config.yaml`, and robust error handling ensure flexibility, reproducibility, and stability in preparing the VQM24 dataset for diverse machine learning tasks.
 
-## Features
+
+## **Features**
 
 * **Automatic Data Download:** Seamlessly downloads the VQM24 dataset (NPZ file) from Zenodo.
 * **Configurable Data Enrichment:**
@@ -29,11 +46,11 @@ It leverages RDKit for comprehensive molecular structural feature extraction and
 * **Robust Error Handling:** Implements custom exceptions and graceful handling for various issues during molecule conversion, feature extraction, and filtering, ensuring the pipeline continues processing even with problematic data points.
 * **Persistent Storage:** Saves the processed dataset as a single `.pt` file for fast loading in subsequent runs.
 
-## Installation
+## **Installation**
 
 1.  **Clone the repository:**
     ```bash
-    git clone git@github.com:shahram-boshra/vqm24_database_process.git (https://github.com/shahram-boshra/vqm24_database_process.git)
+    git clone [https://github.com/your-username/vqm24-dataset-pipeline.git](https://github.com/your-username/vqm24-dataset-pipeline.git)
     cd vqm24-dataset-pipeline
     ```
 
@@ -51,7 +68,7 @@ It leverages RDKit for comprehensive molecular structural feature extraction and
     ```
     *Note: Ensure you install `torch-geometric` compatible with your PyTorch version and CUDA setup.*
 
-## Usage
+## **Usage**
 
 The primary entry point for processing the dataset is `main.py`.
 
@@ -68,7 +85,7 @@ The primary entry point for processing the dataset is `main.py`.
     * Save the processed `torch_geometric.data.Data` objects to `data/processed/DFT_all.pt`.
     * Perform a quick integrity test on a sample of the processed data.
 
-### Example of loading the processed dataset:
+## **Example of loading the processed dataset:**
 
 ```python
 import torch
@@ -168,4 +185,3 @@ We would like to express our gratitude to the developers and maintainers of the 
     Tqdm: For excellent progress bars, enhancing user experience during data processing.
 
     Requests & PyYAML: For handling data downloads and configuration parsing, respectively.
-

@@ -59,7 +59,7 @@ def add_scalar_graph_targets(
         return
 
     collected_targets = []
-    smiles = getattr(pyg_data, 'smiles', 'N/A') # Get SMILES for better error context
+    inchi = getattr(pyg_data, 'inchi', 'N/A') # Get InChI for better error context
 
     for key in target_keys:
         try:
@@ -82,7 +82,7 @@ def add_scalar_graph_targets(
                     # Raise PropertyEnrichmentError
                     raise PropertyEnrichmentError(
                         molecule_index=molecule_index,
-                        smiles=smiles,
+                        inchi=inchi,
                         property_name=key, # Add property_name
                         reason=f"Scalar target '{key}' has unexpected array shape {value.shape} (size {value.size}). Expected a single scalar or a 1-element array."
                     )
@@ -92,7 +92,7 @@ def add_scalar_graph_targets(
                 # Raise PropertyEnrichmentError
                 raise PropertyEnrichmentError(
                     molecule_index=molecule_index,
-                    smiles=smiles,
+                    inchi=inchi,
                     property_name=key, # Add property_name
                     reason=f"Scalar target '{key}' has unexpected type {type(value)} or is missing. Expected a numeric scalar or NumPy array."
                 )
@@ -102,7 +102,7 @@ def add_scalar_graph_targets(
                 # Raise PropertyEnrichmentError
                 raise PropertyEnrichmentError(
                     molecule_index=molecule_index,
-                    smiles=smiles,
+                    inchi=inchi,
                     property_name=key, # Add property_name
                     reason=f"Scalar target '{key}' has NaN, Inf, or None value after initial conversion."
                 )
@@ -118,7 +118,7 @@ def add_scalar_graph_targets(
             # Raise PropertyEnrichmentError
             raise PropertyEnrichmentError(
                 molecule_index=molecule_index,
-                smiles=smiles,
+                inchi=inchi,
                 property_name=key, # Add property_name
                 reason=f"Critical error processing scalar target '{key}'.",
                 detail=str(e)
@@ -158,7 +158,7 @@ def add_node_features(
     if not feature_keys:
         return
 
-    smiles = getattr(pyg_data, 'smiles', 'N/A') # Get SMILES for better error context
+    inchi = getattr(pyg_data, 'inchi', 'N/A') # Get InChI for better error context
 
     original_x_num_features = pyg_data.x.shape[1] if hasattr(pyg_data, 'x') and pyg_data.x is not None else 0
     additional_node_features_tensors = []
@@ -170,7 +170,7 @@ def add_node_features(
     if expected_num_nodes == 0:
         raise PropertyEnrichmentError(
             molecule_index=molecule_index,
-            smiles=smiles,
+            inchi=inchi,
             reason="Cannot add node features: Number of nodes (derived from z or x) is 0."
         )
 
@@ -186,7 +186,7 @@ def add_node_features(
                not (isinstance(node_values, np.ndarray) and node_values.ndim == 1 and node_values.shape[0] == expected_num_nodes):
                 raise PropertyEnrichmentError(
                     molecule_index=molecule_index,
-                    smiles=smiles,
+                    inchi=inchi,
                     property_name=key, # Add property_name
                     reason=f"Missing, invalid, or shape mismatch for node feature '{key}' (expected {expected_num_nodes} got {node_values.shape[0] if isinstance(node_values, np.ndarray) else 'N/A'})."
                 )
@@ -198,7 +198,7 @@ def add_node_features(
         except Exception as e:
             raise PropertyEnrichmentError(
                 molecule_index=molecule_index,
-                smiles=smiles,
+                inchi=inchi,
                 property_name=key, # Add property_name
                 reason=f"Error fetching node-level feature '{key}'.",
                 detail=str(e)
@@ -216,7 +216,7 @@ def add_node_features(
             if pyg_data.x.size(0) != expected_num_nodes:
                 raise PropertyEnrichmentError(
                     molecule_index=molecule_index,
-                    smiles=smiles,
+                    inchi=inchi,
                     reason=f"Node count mismatch before concatenating new features: pyg_data.x has {pyg_data.x.size(0)} nodes, but expected {expected_num_nodes}."
                 )
 
@@ -231,7 +231,7 @@ def add_node_features(
     if not hasattr(pyg_data, 'x') or pyg_data.x is None or pyg_data.x.numel() == 0:
         raise PropertyEnrichmentError(
             molecule_index=molecule_index,
-            smiles=smiles,
+            inchi=inchi,
             reason="Final check: pyg_data.x is still missing or empty after attempting to add node features."
         )
 
@@ -246,7 +246,7 @@ def add_vector_graph_properties(
     mol_idx: int,
     raw_properties_dict: Dict[str, Union[np.ndarray, None]],
     prop_keys: List[str],
-    smiles: str,
+    inchi: str,
     logger: logging.Logger
 ) -> None:
     """
@@ -262,7 +262,7 @@ def add_vector_graph_properties(
         mol_idx (int): The index of the molecule being processed.
         raw_properties_dict (dict): A dictionary containing all raw data extracted for the molecule.
         prop_keys (list): A list of string keys for the vector properties to add.
-        smiles (str): The SMILES string of the molecule, used for error context.
+        inchi (str): The InChI string of the molecule, used for error context.
         logger (logging.Logger): The logger instance.
 
     Raises:
@@ -273,7 +273,7 @@ def add_vector_graph_properties(
     if pyg_data.num_nodes == 0 or not hasattr(pyg_data, 'pos') or pyg_data.pos is None or pyg_data.pos.numel() == 0:
         raise PropertyEnrichmentError(
             molecule_index=mol_idx,
-            smiles=smiles,
+            inchi=inchi,
             reason="No nodes or valid positions found for vector graph properties."
         )
 
@@ -285,7 +285,7 @@ def add_vector_graph_properties(
             if not _is_value_valid_and_not_nan(value):
                 raise PropertyEnrichmentError(
                     molecule_index=mol_idx,
-                    smiles=smiles,
+                    inchi=inchi,
                     property_name=prop_key, # Add property_name
                     reason=f"Missing, invalid, or NaN vector property '{prop_key}'."
                 )
@@ -293,7 +293,7 @@ def add_vector_graph_properties(
             if not isinstance(value, np.ndarray) or value.ndim != 1:
                 raise PropertyEnrichmentError(
                     molecule_index=mol_idx,
-                    smiles=smiles,
+                    inchi=inchi,
                     property_name=prop_key, # Add property_name
                     reason=f"Vector property '{prop_key}' is not a 1D array. Actual type: {type(value)}, Actual dims: {getattr(value, 'ndim', 'N/A')}."
                 )
@@ -304,12 +304,12 @@ def add_vector_graph_properties(
                     # If rots is (2,), pad it to (3,) with a zero
                     # This accounts for linear molecules where one rotational constant is effectively zero/infinite
                     padded_value = np.pad(value, (0, 1), 'constant', constant_values=0.0)
-                    logger.debug(f"      Padded 'rots' for index {mol_idx} (SMILES: {smiles}) from {value.shape} to {padded_value.shape}.")
+                    logger.debug(f"      Padded 'rots' for index {mol_idx} (InChI: {inchi}) from {value.shape} to {padded_value.shape}.")
                     value = padded_value
                 elif value.shape != (3,):
                     raise PropertyEnrichmentError(
                         molecule_index=mol_idx,
-                        smiles=smiles,
+                        inchi=inchi,
                         property_name=prop_key, # Add property_name
                         reason=f"Vector property '{prop_key}' has unexpected shape {value.shape}. Expected (3,) or (2,)."
                     )
@@ -319,41 +319,40 @@ def add_vector_graph_properties(
             elif prop_key == 'dipole' and value.shape != (3,):
                 raise PropertyEnrichmentError(
                     molecule_index=mol_idx,
-                    smiles=smiles,
+                    inchi=inchi,
                     property_name=prop_key, # Add property_name
                     reason=f"Vector property '{prop_key}' has unexpected shape {value.shape}. Expected (3,)."
                 )
             elif prop_key == 'quadrupole' and value.shape != (6,):
                 raise PropertyEnrichmentError(
                     molecule_index=mol_idx,
-                    smiles=smiles,
+                    inchi=inchi,
                     property_name=prop_key, # Add property_name
                     reason=f"Vector property '{prop_key}' has unexpected shape {value.shape}. Expected (6,)."
                 )
             elif prop_key == 'octupole' and value.shape != (10,):
                 raise PropertyEnrichmentError(
                     molecule_index=mol_idx,
-                    smiles=smiles,
+                    inchi=inchi,
                     property_name=prop_key, # Add property_name
                     reason=f"Vector property '{prop_key}' has unexpected shape {value.shape}. Expected (10,)."
                 )
             elif prop_key == 'hexadecapole' and value.shape != (15,):
                 raise PropertyEnrichmentError(
                     molecule_index=mol_idx,
-                    smiles=smiles,
+                    inchi=inchi,
                     property_name=prop_key, # Add property_name
                     reason=f"Vector property '{prop_key}' has unexpected shape {value.shape}. Expected (15,)."
                 )
 
             setattr(pyg_data, prop_key, torch.tensor(value, dtype=torch.float32))
-
         # Catch PropertyEnrichmentError explicitly, then general Exception
         except PropertyEnrichmentError:
             raise # Re-raise our specific error
         except Exception as e:
             raise PropertyEnrichmentError(
                 molecule_index=mol_idx,
-                smiles=smiles,
+                inchi=inchi,
                 property_name=prop_key, # Add property_name
                 reason=f"Error processing vector property '{prop_key}'.",
                 detail=str(e)
@@ -386,13 +385,13 @@ def add_variable_len_graph_properties(
     Raises:
         PropertyEnrichmentError: If a property is missing, invalid, or has an unexpected format/shape.
     """
-    smiles = getattr(pyg_data, 'smiles', 'N/A') # Get SMILES for better error context
+    inchi = getattr(pyg_data, 'inchi', 'N/A') # Get InChI for better error context
 
     # Early exit if there are no nodes, as variable-length properties often relate to atoms/structure
     if pyg_data.num_nodes == 0:
         raise PropertyEnrichmentError(
             molecule_index=molecule_index,
-            smiles=smiles,
+            inchi=inchi,
             reason="No nodes found for variable-length graph properties."
         )
 
@@ -405,7 +404,7 @@ def add_variable_len_graph_properties(
             if not _is_value_valid_and_not_nan(value):
                 raise PropertyEnrichmentError(
                     molecule_index=molecule_index,
-                    smiles=smiles,
+                    inchi=inchi,
                     property_name=key, # Add property_name
                     reason=f"Missing, invalid, or NaN variable-length property '{key}'."
                 )
@@ -416,7 +415,7 @@ def add_variable_len_graph_properties(
                 if num_atoms == 0:
                     raise PropertyEnrichmentError(
                         molecule_index=molecule_index,
-                        smiles=smiles,
+                        inchi=inchi,
                         property_name=key, # Add property_name
                         reason=f"Cannot process 'vibmodes' for index {molecule_index}: num_nodes is 0."
                     )
@@ -428,7 +427,7 @@ def add_variable_len_graph_properties(
                     if value.shape[0] % num_atoms != 0:
                         raise PropertyEnrichmentError(
                             molecule_index=molecule_index,
-                            smiles=smiles,
+                            inchi=inchi,
                             property_name=key, # Add property_name
                             reason=f"'vibmodes' array has shape {value.shape}, but first dimension ({value.shape[0]}) is not a multiple of num_nodes ({num_atoms}). Cannot reshape to (num_modes, num_nodes, 3)."
                         )
@@ -442,7 +441,7 @@ def add_variable_len_graph_properties(
                 else:
                     raise PropertyEnrichmentError(
                         molecule_index=molecule_index,
-                        smiles=smiles,
+                        inchi=inchi,
                         property_name=key, # Add property_name
                         reason=f"'vibmodes' array has unexpected NumPy array format or type: {value.shape if isinstance(value, np.ndarray) else type(value)}."
                     )
@@ -465,7 +464,7 @@ def add_variable_len_graph_properties(
         except Exception as e:
             raise PropertyEnrichmentError(
                 molecule_index=molecule_index,
-                smiles=smiles,
+                inchi=inchi,
                 property_name=key, # Add property_name
                 reason=f"Error fetching variable-length property '{key}'.",
                 detail=str(e)
@@ -476,7 +475,7 @@ def calculate_atomization_energy(
     molecular_total_energy_hartree: float,
     atomic_numbers_tensor: torch.Tensor,
     molecule_index: int,
-    smiles: str,
+    inchi: str,
     logger: logging.Logger
 ) -> float:
     """
@@ -491,7 +490,7 @@ def calculate_atomization_energy(
         atomic_numbers_tensor (torch.Tensor): A 1D tensor containing the atomic numbers (Z)
                                                for all atoms in the molecule.
         molecule_index (int): The unique index of the molecule being processed.
-        smiles (str): The SMILES string representation of the molecule.
+        inchi (str): The InChI string representation of the molecule.
         logger (logging.Logger): The logger instance for recording messages.
 
     Returns:
@@ -523,7 +522,7 @@ def calculate_atomization_energy(
         if atomic_energy is None:
             raise PropertyEnrichmentError(
                 molecule_index=molecule_index,
-                smiles=smiles,
+                inchi=inchi,
                 reason=f"Missing atomic energy for atomic number {atomic_num}. Cannot calculate atomization energy."
             )
         sum_atomic_energies_hartree += atomic_energy
@@ -563,7 +562,7 @@ def add_derived_graph_targets(
                                  input data, or unexpected data types/formats.
         ConfigurationError: If essential configuration for derived properties is missing or invalid.
     """
-    smiles = getattr(pyg_data, 'smiles', 'N/A') # Get SMILES for better error context
+    inchi = getattr(pyg_data, 'inchi', 'N/A') # Get InChI for better error context
 
     # Atomization energy calculation
     atomization_energy_base_key = data_config.get('calculate_atomization_energy_from')
@@ -576,7 +575,7 @@ def add_derived_graph_targets(
         if not _is_value_valid_and_not_nan(molecular_total_energy_hartree):
             raise PropertyEnrichmentError(
                 molecule_index=molecule_index,
-                smiles=smiles,
+                inchi=inchi,
                 property_name=atomization_energy_base_key, # Add property_name
                 reason=f"Cannot calculate atomization energy: Base energy '{atomization_energy_base_key}' is missing or invalid."
             )
@@ -586,7 +585,7 @@ def add_derived_graph_targets(
         elif not isinstance(molecular_total_energy_hartree, (int, float, np.number)):
             raise PropertyEnrichmentError(
                 molecule_index=molecule_index,
-                smiles=smiles,
+                inchi=inchi,
                 property_name=atomization_energy_base_key, # Add property_name
                 reason=f"Cannot calculate atomization energy: Base energy '{atomization_energy_base_key}' has unexpected type {type(molecular_total_energy_hartree)}."
             )
@@ -595,7 +594,7 @@ def add_derived_graph_targets(
         if not hasattr(pyg_data, 'z') or pyg_data.z is None or pyg_data.z.numel() == 0:
             raise PropertyEnrichmentError(
                 molecule_index=molecule_index,
-                smiles=smiles,
+                inchi=inchi,
                 reason=f"Missing, None, or empty 'z' (atomic numbers). Cannot calculate atomization energy."
             )
 
@@ -604,7 +603,7 @@ def add_derived_graph_targets(
                 molecular_total_energy_hartree,
                 pyg_data.z,
                 molecule_index, # Pass molecule_index
-                smiles,          # Pass smiles
+                inchi,          # Pass inchi
                 logger
             )
 
@@ -613,7 +612,7 @@ def add_derived_graph_targets(
                 # but kept as a defensive check.
                 raise PropertyEnrichmentError(
                     molecule_index=molecule_index,
-                    smiles=smiles,
+                    inchi=inchi,
                     reason=f"Calculated atomization energy is NaN (likely due to missing atomic energy data for one or more atoms)."
                 )
 
@@ -632,7 +631,7 @@ def add_derived_graph_targets(
             # Catch any other unexpected errors during calculation
             raise PropertyEnrichmentError(
                 molecule_index=molecule_index,
-                smiles=smiles,
+                inchi=inchi,
                 reason=f"Error calculating atomization energy.",
                 detail=str(e)
             ) from e
@@ -642,7 +641,7 @@ def enrich_pyg_data_with_properties(
     pyg_data: Data,
     mol_idx: int,
     raw_properties_dict: Dict[str, Any],
-    smiles: str,
+    inchi_identifier: str, # MODIFIED LINE
     logger: logging.Logger,
     data_config: Optional[Dict[str, Any]] = None,
 ) -> Data:
@@ -663,7 +662,7 @@ def enrich_pyg_data_with_properties(
         mol_idx (int): The unique index of the current molecule.
         raw_properties_dict (dict): A dictionary containing all pre-extracted raw data
                                     for the current molecule, accessible by property key.
-        smiles (str): The SMILES string of the current molecule, used for error context.
+        inchi_identifier (str): The InChI string of the current molecule, used for error context. # MODIFIED LINE
         logger (logging.Logger): The logger instance for recording messages.
         data_config (dict, optional): A dictionary specifying which properties to include
                                       or derive. Defaults to an empty dictionary if None.
@@ -704,7 +703,7 @@ def enrich_pyg_data_with_properties(
         if pyg_data.num_nodes == 0:
             raise PropertyEnrichmentError(
                 molecule_index=mol_idx,
-                smiles=smiles,
+                inchi=inchi_identifier, # MODIFIED LINE
                 reason="PyG data object has 0 nodes after initial processing."
             )
 
@@ -718,7 +717,7 @@ def enrich_pyg_data_with_properties(
 
         # 4. Add vector graph properties
         # Pass raw_properties_dict
-        add_vector_graph_properties(pyg_data, mol_idx, raw_properties_dict, vector_graph_properties_to_include, smiles, logger)
+        add_vector_graph_properties(pyg_data, mol_idx, raw_properties_dict, vector_graph_properties_to_include, inchi_identifier, logger) 
 
         # 5. Add variable-length graph properties
         # Pass raw_properties_dict
@@ -729,16 +728,16 @@ def enrich_pyg_data_with_properties(
         # If any of the called functions raises our specific errors,
         # we simply re-raise them. The caller (e.g., VQM24Dataset.process)
         # will then catch it and handle the incomplete molecule.
-        logger.warning(f"Molecule {mol_idx} (SMILES: {smiles}) processing failed at enrichment stage. Propagating error.")
+        logger.warning(f"Molecule {mol_idx} {inchi_identifier} processing failed at enrichment stage. Propagating error.") 
         raise
 
     except Exception as e:
         # Catch any other unexpected errors during the enrichment process itself
         # that weren't caught by the specific property functions.
-        logger.error(f"Unexpected error during enrichment for molecule {mol_idx} (SMILES: {smiles}): {e}", exc_info=True)
+        logger.error(f"Unexpected error during enrichment for molecule {mol_idx} (InChI: {inchi_identifier}): {e}", exc_info=True) 
         raise PropertyEnrichmentError(
             molecule_index=mol_idx,
-            smiles=smiles,
+            inchi=inchi_identifier, 
             reason="Unexpected error during property enrichment.",
             detail=str(e)
         ) from e

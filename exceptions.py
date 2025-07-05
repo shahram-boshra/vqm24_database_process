@@ -85,21 +85,21 @@ class DataProcessingError(BaseProjectError):
 
 class MoleculeProcessingError(DataProcessingError): # Inherit from DataProcessingError
     """Custom exception for errors encountered during molecule processing."""
-    def __init__(self, message: str = "Error processing molecule.", molecule_index: Optional[int] = None, smiles: Optional[str] = None, reason: Optional[str] = None, detail: Optional[str] = None) -> None:
+    def __init__(self, message: str = "Error processing molecule.", molecule_index: Optional[int] = None, inchi: Optional[str] = None, reason: Optional[str] = None, detail: Optional[str] = None) -> None:
         """
         Initializes the MoleculeProcessingError.
 
         Args:
             message (str): A general description of the molecule processing error.
             molecule_index (Optional[int]): The index of the molecule in the dataset, if applicable.
-            smiles (Optional[str]): The SMILES string of the molecule that caused the error.
+            inchi (Optional[str]): The InChI string of the molecule that caused the error.
             reason (Optional[str]): A brief explanation of why the processing failed.
             detail (Optional[str]): Further technical or specific details about the failure.
         """
         # Construct a more specific message for the parent DataProcessingError
         full_message: str = message
-        if molecule_index is not None and smiles is not None and reason is not None:
-            full_message = f"Mol {molecule_index} (SMILES: {smiles}): {reason}"
+        if molecule_index is not None and inchi is not None and reason is not None:
+            full_message = f"Mol {molecule_index} (InChI: {inchi}): {reason}"
             if detail:
                 full_message += f" Detail: {detail}"
         elif reason: # If only reason is provided
@@ -108,7 +108,7 @@ class MoleculeProcessingError(DataProcessingError): # Inherit from DataProcessin
 
         super().__init__(message=full_message, item_identifier=f"Mol {molecule_index}" if molecule_index is not None else None, details=reason)
         self.molecule_index: Optional[int] = molecule_index
-        self.smiles: Optional[str] = smiles
+        self.inchi: Optional[str] = inchi
         self.reason: Optional[str] = reason
         self.detail: Optional[str] = detail
 
@@ -117,14 +117,14 @@ class MoleculeProcessingError(DataProcessingError): # Inherit from DataProcessin
         msg: str = f"Error processing molecule"
         if self.molecule_index is not None:
             msg += f" (Index: {self.molecule_index}"
-            if self.smiles:
-                msg += f", SMILES: {self.smiles}"
+            if self.inchi:
+                msg += f", InChI: {self.inchi}"
             msg += ")"
-        
+
         if self.reason:
             msg += f": {self.reason}"
         elif self.message: # Fallback to general message if no specific reason
-             msg += f": {self.message}"
+            msg += f": {self.message}"
 
         if self.detail:
             msg += f". Details: {self.detail}"
@@ -138,22 +138,22 @@ class MoleculeFilterRejectedError(MoleculeProcessingError):
     This exception signifies an expected outcome based on filtering rules,
     rather than an unexpected processing failure.
     """
-    def __init__(self, molecule_index: int, smiles: str, reason: str, detail: Optional[str] = None) -> None:
+    def __init__(self, molecule_index: int, inchi: str, reason: str, detail: Optional[str] = None) -> None:
         """
         Initializes the MoleculeFilterRejectedError.
 
         Args:
             molecule_index (int): The index of the molecule in the dataset.
-            smiles (str): The SMILES string of the rejected molecule.
+            inchi (str): The InChI string of the rejected molecule.
             reason (str): The specific filter criterion that led to the rejection.
             detail (Optional[str]): Additional details about the rejection, if any.
         """
         # When raising this, the 'reason' should clearly state 'filter rejected'
         super().__init__(
-            message=f"Molecule rejected by filter.", # A more general message for the parent
+            message=f"Molecule rejected by filter.",
             molecule_index=molecule_index,
-            smiles=smiles,
-            reason=reason, # Specific reason for rejection
+            inchi=inchi,
+            reason=reason,
             detail=detail
         )
         # No additional attributes needed, as parent handles them.
@@ -209,53 +209,53 @@ class AtomFilterError(ConfigurationError):
 
 class RDKitConversionError(MoleculeProcessingError):
     """Exception raised when RDKit fails to create a molecule or conformer."""
-    def __init__(self, message: str = "Failed to create RDKit molecule or conformer.", molecule_index: Optional[int] = None, smiles: Optional[str] = None, reason: Optional[str] = None, detail: Optional[str] = None) -> None:
+    def __init__(self, message: str = "Failed to create RDKit molecule or conformer.", molecule_index: Optional[int] = None, inchi: Optional[str] = None, reason: Optional[str] = None, detail: Optional[str] = None) -> None:
         """
         Initializes the RDKitConversionError.
 
         Args:
             message (str): A general message about the RDKit conversion failure.
             molecule_index (Optional[int]): The index of the molecule.
-            smiles (Optional[str]): The SMILES string of the molecule.
+            inchi (Optional[str]): The InChI string of the molecule.
             reason (Optional[str]): The reason for the RDKit conversion failure.
             detail (Optional[str]): Specific details about the RDKit error.
         """
-        super().__init__(message=message, molecule_index=molecule_index, smiles=smiles, reason=reason, detail=detail)
+        super().__init__(message=message, molecule_index=molecule_index, inchi=inchi, reason=reason, detail=detail)
 
 
 class PyGDataCreationError(MoleculeProcessingError):
     """Exception raised when there's an issue creating the PyTorch Geometric Data object."""
-    def __init__(self, message: str = "Failed to create PyTorch Geometric Data object.", molecule_index: Optional[int] = None, smiles: Optional[str] = None, reason: Optional[str] = None, detail: Optional[str] = None) -> None:
+    def __init__(self, message: str = "Failed to create PyTorch Geometric Data object.", molecule_index: Optional[int] = None, inchi: Optional[str] = None, reason: Optional[str] = None, detail: Optional[str] = None) -> None:
         """
         Initializes the PyGDataCreationError.
 
         Args:
             message (str): A general message about the PyTorch Geometric Data object creation failure.
             molecule_index (Optional[int]): The index of the molecule.
-            smiles (Optional[str]): The SMILES string of the molecule.
+            inchi (Optional[str]): The InChI string of the molecule.
             reason (Optional[str]): The reason for the PyG Data creation failure.
             detail (Optional[str]): Specific details about the PyG Data error.
         """
-        super().__init__(message=message, molecule_index=molecule_index, smiles=smiles, reason=reason, detail=detail)
+        super().__init__(message=message, molecule_index=molecule_index, inchi=inchi, reason=reason, detail=detail)
 
 
 class PropertyEnrichmentError(MoleculeProcessingError):
     """Exception raised when an error occurs during property enrichment."""
-    def __init__(self, message: str = "Failed to enrich PyG Data with properties.", molecule_index: Optional[int] = None, smiles: Optional[str] = None, property_name: Optional[str] = None, reason: Optional[str] = None, detail: Optional[str] = None) -> None:
+    def __init__(self, message: str = "Failed to enrich PyG Data with properties.", molecule_index: Optional[int] = None, inchi: Optional[str] = None, property_name: Optional[str] = None, reason: Optional[str] = None, detail: Optional[str] = None) -> None:
         """
         Initializes the PropertyEnrichmentError.
 
         Args:
             message (str): A general message about the property enrichment failure.
             molecule_index (Optional[int]): The index of the molecule.
-            smiles (Optional[str]): The SMILES string of the molecule.
+            inchi (Optional[str]): The InChI string of the molecule.
             property_name (Optional[str]): The name of the property that failed to be enriched.
             reason (Optional[str]): The reason for the property enrichment failure.
             detail (Optional[str]): Specific details about the enrichment error.
         """
-        super().__init__(message=message, molecule_index=molecule_index, smiles=smiles, reason=reason, detail=detail)
+        super().__init__(message=message, molecule_index=molecule_index, inchi=inchi, reason=reason, detail=detail)
         self.property_name: Optional[str] = property_name
-    
+
     def __str__(self) -> str:
         msg: str = super().__str__()
         if self.property_name:
@@ -269,25 +269,25 @@ class StructuralFeatureError(MoleculeProcessingError):
     assignment of structural features (atom or bond features).
     """
     def __init__(self, message: str = "Failed to calculate or assign structural features.",
-                 molecule_index: Optional[int] = None,
-                 smiles: Optional[str] = None,
-                 feature_type: Optional[str] = None, # "atom" or "bond"
-                 feature_name: Optional[str] = None, # specific feature name, e.g., "hybridization"
-                 reason: Optional[str] = None,
-                 detail: Optional[str] = None) -> None:
+                     molecule_index: Optional[int] = None,
+                     inchi: Optional[str] = None,
+                     feature_type: Optional[str] = None, # "atom" or "bond"
+                     feature_name: Optional[str] = None, # specific feature name, e.g., "hybridization"
+                     reason: Optional[str] = None,
+                     detail: Optional[str] = None) -> None:
         """
         Initializes the StructuralFeatureError.
 
         Args:
             message (str): A general message about the structural feature failure.
             molecule_index (Optional[int]): The index of the molecule.
-            smiles (Optional[str]): The SMILES string of the molecule.
+            inchi (Optional[str]): The InChI string of the molecule.
             feature_type (Optional[str]): The type of feature being processed ("atom" or "bond").
             feature_name (Optional[str]): The specific feature name that caused the error.
             reason (Optional[str]): The reason for the structural feature failure.
             detail (Optional[str]): Specific details about the error.
         """
-        super().__init__(message=message, molecule_index=molecule_index, smiles=smiles, reason=reason, detail=detail)
+        super().__init__(message=message, molecule_index=molecule_index, inchi=inchi, reason=reason, detail=detail)
         self.feature_type: Optional[str] = feature_type
         self.feature_name: Optional[str] = feature_name
 

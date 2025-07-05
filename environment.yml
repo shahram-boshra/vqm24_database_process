@@ -1,0 +1,23 @@
+name: shah_env
+channels:
+  - pytorch
+  - pyg
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - numpy=1.26.4
+  - pytorch=2.3.1
+  - cpuonly
+  - rdkit=2024.03.1
+  - pyyaml
+  - scipy
+  - torch-geometric
+  - pandas
+  - matplotlib
+  # You can optionally pin versions for pandas and matplotlib too if you have specific requirements:
+  # - pandas=2.2.0
+  # - matplotlib=3.8.4
+  # It's generally good practice to be explicit with versions for reproducibility.
+  # Conda will try to find compatible versions if you don't pin them,
+  # but pinning gives you more control.

@@ -98,11 +98,11 @@ class VQM24Dataset(InMemoryDataset):
         root (str): Root directory where the dataset should be saved. This directory
                     will contain `raw` and `processed` subdirectories.
         npz_file_path (str): The filename of the raw NPZ data file (e.g., "DFT_all.npz").
-                             The dataset will attempt to download this file into `root/raw/`.
+                              The dataset will attempt to download this file into `root/raw/`.
         data_config (Dict[str, Any]): Configuration dictionary specifying which properties
                                        to extract and how to handle them during molecule conversion.
         filter_config (Dict[str, Any]): Configuration dictionary for applying pre-filters
-                                         to molecules (e.g., 'max_atoms', 'heavy_atom_filter').
+                                        to molecules (e.g., 'max_atoms', 'heavy_atom_filter').
         logger (logging.Logger): A logger instance for recording dataset-related messages.
         chunk_size (int, optional): The number of molecules to process before saving
                                     them to a temporary chunk file. Defaults to 5000.
@@ -111,8 +111,8 @@ class VQM24Dataset(InMemoryDataset):
                                              object and returns a transformed version. Applied on the fly
                                              when accessing individual data points. Defaults to None.
         pre_transform (Optional[Any], optional): A function/transform that takes in a `torch_geometric.data.Data`
-                                                  object and returns a transformed version. Applied once before
-                                                  saving to disk. Defaults to None.
+                                                 object and returns a transformed version. Applied once before
+                                                 saving to disk. Defaults to None.
         pre_filter (Optional[Any], optional): A function that takes in a `torch_geometric.data.Data`
                                                object and returns a boolean value, indicating whether
                                                the data object should be included in the final dataset.
@@ -145,7 +145,7 @@ class VQM24Dataset(InMemoryDataset):
         self.raw_data_filename: str = Path(npz_file_path).name # Store just the filename
         self.data_config: Dict[str, Any] = data_config
         self.filter_config: Dict[str, Any] = filter_config
-        self.structural_features_config: Dict[str, Any] = structural_features_config 
+        self.structural_features_config: Dict[str, Any] = structural_features_config
         self.logger: logging.Logger = logger
         self.chunk_size: int = chunk_size
         self.force_reload: bool = force_reload
@@ -154,20 +154,27 @@ class VQM24Dataset(InMemoryDataset):
         self.logger.info(f"Initializing VQM24Dataset with root: {root}, filters: {filter_config}, chunk_size: {chunk_size}")
         self.pre_transform_pipeline: Optional[Compose] = self._initialize_pre_transforms(pyg_pre_transforms_config)
 
-        safe_classes = [
-            np.dtype,
-            np.dtypes.StrDType,
-            np._core.multiarray.scalar,
-            torch_geometric.data.data.Data,
-            torch_geometric.data.data.DataEdgeAttr,
-            torch_geometric.data.data.DataTensorAttr,
-            torch_geometric.data.storage.GlobalStorage,
-        ]
-        if Compose is not None:
-            safe_classes.append(Compose)
+        # NOTE: torch.serialization.add_safe_globals is deprecated/removed in PyTorch 2.x and later.
+        # PyTorch Geometric Data objects are generally handled by PyTorch's default pickling
+        # mechanisms without needing explicit registration for standard use cases.
+        # If `torch.load` encounters issues with specific custom types within the
+        # serialized data, a more advanced custom deserialization strategy
+        # (e.g., using `dill` or custom `unpickler` in `torch.load`) might be needed.
+        # Removed the following block as it caused an AttributeError:
+        # safe_classes = [
+        #     np.dtype,
+        #     np.dtypes.StrDType, # These NumPy internal types might not exist or have changed in NumPy 2.x
+        #     np._core.multiarray.scalar, # These NumPy internal types might not exist or have changed in NumPy 2.x
+        #     torch_geometric.data.data.Data,
+        #     torch_geometric.data.data.DataEdgeAttr,
+        #     torch_geometric.data.data.DataTensorAttr,
+        #     torch_geometric.data.storage.GlobalStorage,
+        # ]
+        # if Compose is not None:
+        #     safe_classes.append(Compose)
+        # torch.serialization.add_safe_globals(safe_classes) # This line is the direct cause of the error
+        # self.logger.debug("Removed call to torch.serialization.add_safe_globals due to deprecation/removal.")
 
-        torch.serialization.add_safe_globals(safe_classes)
-        self.logger.debug("Added PyTorch Geometric Data attributes and Compose (if found) to safe globals for torch.load/save.")
 
         super().__init__(root, transform, pre_transform=self.pre_transform_pipeline, force_reload=self.force_reload)
 
@@ -229,7 +236,7 @@ class VQM24Dataset(InMemoryDataset):
 
         Raises:
             ConfigurationError: If transform configuration is invalid (e.g., missing name,
-                                 invalid arguments, or no transforms found when enabled).
+                                invalid arguments, or no transforms found when enabled).
             MissingDependencyError: If a specified PyG transform class is not found.
             DataProcessingError: For unexpected errors during transform initialization.
         """
@@ -305,7 +312,6 @@ class VQM24Dataset(InMemoryDataset):
         The main processed data file is `data.pt`.
         """
         return ['data.pt']
-
 
     def download_file(
         url: str,
@@ -397,7 +403,6 @@ class VQM24Dataset(InMemoryDataset):
                     if os.path.exists(destination_path):
                         os.remove(destination_path)
 
-
     def process(self) -> None:
         """
         Processes the raw VQM24 dataset, converting molecules into PyG `Data` objects.
@@ -436,7 +441,8 @@ class VQM24Dataset(InMemoryDataset):
 
         self.logger.info(f"Pre-loading required arrays from {raw_npz_path_for_processing} into memory (mmap_mode='r')...")
         preloaded_data: Dict[str, np.ndarray] = {}
-        all_required_keys: List[str] = ['graphs', 'coordinates'] # Explicitly list minimal required keys
+        # --- MODIFIED: Added 'inchi' and 'atoms' to all_required_keys ---
+        all_required_keys: List[str] = ['graphs', 'coordinates', 'inchi', 'atoms'] # Explicitly list minimal required keys
 
         # Dynamically add all keys specified in data_config that might be needed
         # We need to collect ALL potential keys that any sub-function might try to access
@@ -483,7 +489,7 @@ class VQM24Dataset(InMemoryDataset):
 
         converter: MoleculeDataConverter = MoleculeDataConverter(
             self.logger,
-            structural_features_config=self.structural_features_config 
+            structural_features_config=self.structural_features_config
         ) # No longer pass preloaded_data here
 
         current_chunk_data_list: List[Data] = []
@@ -506,11 +512,16 @@ class VQM24Dataset(InMemoryDataset):
                     if key in preloaded_data:
                         raw_properties_dict_for_current_mol[key] = preloaded_data[key][i]
 
-                # Attempt to get smiles early for robust error logging
-                # Use 'graphs' to get smiles, as confirmed by test_npzkeys.py
-                original_smiles = raw_properties_dict_for_current_mol.get('graphs', 'N/A')
-                if original_smiles is not None:
-                    original_smiles = str(original_smiles)
+                # Attempt to get InChI for robust error logging, as it's the primary identifier
+                # and used for RDKit conversion.
+                # Renamed from original_smiles to original_inchi for accuracy in logs.
+                original_inchi_for_log = raw_properties_dict_for_current_mol.get('inchi', 'N/A')
+                if original_inchi_for_log is None or original_inchi_for_log == 'N/A':
+                    # Fallback if 'inchi' is somehow missing, use 'graphs' as a last resort
+                    original_inchi_for_log = str(raw_properties_dict_for_current_mol.get('graphs', 'N/A'))
+                    self.logger.debug(f"Molecule {i}: 'inchi' not found for logging, falling back to 'graphs' for InChI representation.")
+                else:
+                    original_inchi_for_log = str(original_inchi_for_log) # Ensure it's a string
 
                 # --- Pass raw_properties_dict_for_current_mol to converter.convert ---
                 pyg_data = converter.convert(i, raw_properties_dict_for_current_mol, self.data_config)
@@ -518,7 +529,7 @@ class VQM24Dataset(InMemoryDataset):
                 if pyg_data is None:
                     # converter.convert already logs warnings/errors.
                     # This path means a non-MoleculeProcessingError issue occurred in converter.
-                    self.logger.warning(f"Molecule {i} (SMILES: {original_smiles}) conversion returned None without explicit error. Skipping.")
+                    self.logger.warning(f"Molecule {i} (InChI: {original_inchi_for_log}) conversion returned None without explicit error. Skipping.")
                     skipped_total_count += 1
                     continue # Skip to next molecule
 
@@ -526,7 +537,7 @@ class VQM24Dataset(InMemoryDataset):
                 if self.pre_transform is not None:
                     try:
                         pyg_data = self.pre_transform(pyg_data)
-                        self.logger.debug(f"Applied PyG pre_transform to molecule {i} (SMILES: {original_smiles}).")
+                        self.logger.debug(f"Applied PyG pre_transform to molecule {i} (InChI: {original_inchi_for_log}).")
                     except Exception as e:
                         # Catch errors during PyG pre_transform application
                         raise PyGDataCreationError(
@@ -564,7 +575,7 @@ class VQM24Dataset(InMemoryDataset):
                 skipped_total_count += 1
             except Exception as e:
                 # This block catches any unexpected critical errors not covered by specific exceptions
-                self.logger.critical(f"CRITICAL UNHANDLED ERROR processing molecule {i} (SMILES: {original_smiles}): {e.__class__.__name__} - {e}", exc_info=True)
+                self.logger.critical(f"CRITICAL UNHANDLED ERROR processing molecule {i} (InChI: {original_inchi_for_log}): {e.__class__.__name__} - {e}", exc_info=True)
                 skipped_total_count += 1
 
             # Save chunks
