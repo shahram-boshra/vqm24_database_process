@@ -75,7 +75,7 @@ data_config:
   # The name of the key for the calculated atomization energy (will be appended to pyg_data.y)
   atomization_energy_key_name: Etot_ATOM
 
-  test_molecule_limit: 100 # Set to a specific number to limit processing for testing, or null/remove for full dataset
+  #test_molecule_limit: 100 # Set to a specific number to limit processing for testing, or null/remove for full dataset
 
 # Dataset Filtering Configuration: Defines criteria for filtering molecules
 filter_config: {}

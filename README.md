@@ -1,7 +1,8 @@
 # VQM24 PyTorch Geometric Dataset Processing Pipeline
 
-[![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![PyTorch Geometric](https://img.shields.io/badge/PyG-2.5.0-orange)](https://pytorch-geometric.readthedocs.io/en/latest/)
+[![Docker](https://img.shields.io/badge/Docker-ready-blue.svg?logo=docker&logoColor=white)](https://www.docker.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 
@@ -14,7 +15,7 @@
 * [Features](#features)
 * [Installation](#installation)
 * [Usage](#usage)
-* [Example of loading the processed dataset](#example)
+* [Example of loading the processed dataset](#example-of-loading-the-processed-dataset)
 * [Configuration](#configuration)
 * [Project Structure](#project-structure)
 * [Citation](#citation)
@@ -48,42 +49,67 @@ It leverages RDKit for comprehensive molecular structural feature extraction and
 
 ## **Installation**
 
-1.  **Clone the repository:**
+The recommended way to set up and run this project is by using Docker, which provides a reproducible environment with all necessary Conda dependencies pre-configured.
+
+1.  **Ensure Docker is Installed:**
+    Make sure Docker Desktop (for Windows/macOS) or Docker Engine (for Linux) is installed and running on your system. You can download it from [https://www.docker.com/get-started](https://www.docker.com/get-started).
+
+2.  **Clone the repository:**
     ```bash
     git clone [https://github.com/your-username/vqm24-dataset-pipeline.git](https://github.com/your-username/vqm24-dataset-pipeline.git)
     cd vqm24-dataset-pipeline
     ```
+    *(Remember to replace `https://github.com/your-username/vqm24-dataset-pipeline.git` with the actual URL of your repository.)*
 
-2.  **Create a virtual environment (recommended):**
-    ```bash
-    python -m venv venv
-    source venv/bin/activate # On Windows use `venv\Scripts\activate`
-    ```
+3.  **Build the Docker Image:**
+    This step will create a Docker image named `vqm24-pipeline-env` containing a Conda environment with all project dependencies (RDKit, PyTorch, PyTorch Geometric, etc.) pre-installed as specified in `environment.yml`. This might take some time on the first run as it downloads all packages.
 
-3.  **Install dependencies:**
-    The project relies on `rdkit`, `torch`, `torch-geometric`, `numpy`, `PyYAML`, and `requests`. Install them using pip:
     ```bash
-    pip install torch==2.2.0 torch_geometric==2.5.0 # Adjust versions as needed for your CUDA/system
-    pip install rdkit numpy pyyaml requests tqdm
+    DOCKER_BUILDKIT=1 docker build --network host -t vqm24-pipeline-env .
     ```
-    *Note: Ensure you install `torch-geometric` compatible with your PyTorch version and CUDA setup.*
+    * `DOCKER_BUILDKIT=1`: Enables the faster BuildKit builder.
+    * `--network host`: May be necessary in some network environments (e.g., behind a corporate proxy) to ensure Conda can download packages.
+    * `-t vqm24-pipeline-env`: Tags the image with a memorable name.
+    * `.`: Specifies the current directory as the build context.
 
 ## **Usage**
 
-The primary entry point for processing the dataset is `main.py`.
+Once the Docker image is built, you can run the data processing pipeline directly or access an interactive shell within the container. Your local project code and dataset will be accessible inside the container via Docker volumes.
 
 1.  **Configure `config.yaml`:**
-    Before running, review and adjust the settings in `config.yaml` to define which features and targets you want to include, set filtering criteria, and specify PyG transforms.
+    Before running, review and adjust the settings in `config.yaml` to define which features and targets you want to include, set filtering criteria, and specify PyG transforms. **Make these changes on your host machine in the `08` directory.**
 
-2.  **Run the processing script:**
+2.  **Run the processing script (Recommended for processing):**
+    This command will execute `main.py` inside the Docker container within the dedicated `shah_env` Conda environment. Your local `08` directory (containing `main.py` and other modules) will be mounted to `/app/08` in the container, and your `Chem_Data` will be mounted to `/root/Chem_Data`.
+
     ```bash
-    python main.py
+    docker run --rm \
+      -v "$(pwd)/08:/app/08" \
+      -v "$(pwd)/Chem_Data/VQM24_PyG_Dataset:/root/Chem_Data/VQM24_PyG_Dataset" \
+      vqm24-pipeline-env conda run -n shah_env python /app/08/main.py
     ```
+    * `--rm`: Automatically removes the container after it exits.
+    * `-v "$(pwd)/08:/app/08"`: Mounts your local `08` directory (relative to where you run the command, i.e., the project root) to `/app/08` inside the container. This allows `main.py` to be found and for you to modify your code on the host, with changes instantly reflected in the container.
+    * `-v "$(pwd)/Chem_Data/VQM24_PyG_Dataset:/root/Chem_Data/VQM24_PyG_Dataset"`: Mounts your local `Chem_Data/VQM24_PyG_Dataset` directory (relative to the project root) to the specified path in the container, making your raw and processed data accessible.
+    * `vqm24-pipeline-env`: The name of the Docker image you built.
+    * `conda run -n shah_env python /app/08/main.py`: Executes the `main.py` script within the `shah_env` Conda environment.
+
     This script will:
-    * Download the raw `DFT_all.npz` file from Zenodo (if not already present).
+    * Download the raw `DFT_all.npz` file from Zenodo (if not already present within the mounted `/root/Chem_Data/VQM24_PyG_Dataset` directory).
     * Process the dataset according to `config.yaml` settings.
-    * Save the processed `torch_geometric.data.Data` objects to `data/processed/DFT_all.pt`.
+    * Save the processed `torch_geometric.data.Data` objects to `/root/Chem_Data/VQM24_PyG_Dataset/processed/data.pt`.
     * Perform a quick integrity test on a sample of the processed data.
+
+3.  **Accessing an Interactive Shell (for development/debugging):**
+    If you need to explore the environment, debug, or run commands manually within the container, you can launch an interactive shell with the Conda environment activated:
+
+    ```bash
+    docker run -it --rm \
+      -v "$(pwd)/08:/app/08" \
+      -v "$(pwd)/Chem_Data/VQM24_PyG_Dataset:/root/Chem_Data/VQM24_PyG_Dataset" \
+      vqm24-pipeline-env bash --login
+    ```
+    Once inside, you will find the `shah_env` Conda environment automatically activated (indicated by `(shah_env)` in your prompt). You can then `cd /app/08` and run Python scripts or other commands as needed.
 
 ## **Example of loading the processed dataset:**
 
@@ -96,10 +122,11 @@ from logging_config import setup_logging
 
 # Initialize logging and load configuration
 logger = setup_logging()
-full_config = load_config('config.yaml')
+full_config = load_config('/app/08/config.yaml') # IMPORTANT: Adjust path for container environment
 
 # Define dataset parameters
-root_dir = './data' # Directory where raw and processed data will be stored
+# Path inside the container where raw and processed data will be stored/accessed
+root_dir = '/root/Chem_Data/VQM24_PyG_Dataset' 
 npz_file_name = 'DFT_all.npz'
 
 # Instantiate the dataset
@@ -126,7 +153,9 @@ for batch in loader:
 
 Configuration
 
-The config.yaml file is central to controlling the data processing pipeline. Key sections include:
+The config.yaml file is central to controlling the data processing pipeline. This file should be edited on your host machine within the 08 directory.
+
+Key sections include:
 
     global_constants: Defines conversion factors and lookup tables.
 
@@ -147,6 +176,8 @@ Refer to the comments within config.yaml for detailed explanations of each param
 Project Structure
 
 .
+├── Dockerfile                      # Defines the Docker image for the project environment
+├── environment.yml                 # Conda environment definition with all dependencies
 ├── config.yaml                     # Main configuration file for the data pipeline
 ├── main.py                         # Entry point for running the dataset processing
 ├── vqm24_dataset.py                # Implements the torch_geometric.data.InMemoryDataset for VQM24
@@ -157,7 +188,9 @@ Project Structure
 ├── molecule_filters.py             # Implements pre-filtering logic for molecules
 ├── data_utils.py                   # General utility functions for data validation and access
 ├── exceptions.py                   # Custom exception classes for robust error handling
-└── logging_config.py               # Configures the application's logging system
+├── logging_config.py               # Configures the application's logging system
+├── README.md                       # Project overview and instructions (this file)
+└── .gitignore                      # Specifies files/directories to ignore in Git
 
 Citation
 
@@ -174,7 +207,9 @@ Link: arXiv:2402.04631
 
 Acknowledgements
 
-We would like to express our gratitude to the developers and maintainers of the following open-source libraries, which are integral to this project:
+We would like to express our gratitude to the developers and maintainers of the following open-source libraries and tools, which are integral to this project:
+
+    Docker: For providing a robust platform for building, shipping, and running our application in a consistent and reproducible environment.
 
     RDKit: For its powerful cheminformatics functionalities, essential for molecular representation and feature extraction.
 
