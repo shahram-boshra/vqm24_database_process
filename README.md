@@ -56,10 +56,9 @@ The recommended way to set up and run this project is by using Docker, which pro
 
 2.  **Clone the repository:**
     ```bash
-    git clone [https://github.com/your-username/vqm24-dataset-pipeline.git](https://github.com/your-username/vqm24-dataset-pipeline.git)
+    git clone https://github.com/shahram-boshra/vqm24_database_process.git (git@github.com:shahram-boshra/vqm24_database_process.git)
     cd vqm24-dataset-pipeline
     ```
-    *(Remember to replace `https://github.com/your-username/vqm24-dataset-pipeline.git` with the actual URL of your repository.)*
 
 3.  **Build the Docker Image:**
     This step will create a Docker image named `vqm24-pipeline-env` containing a Conda environment with all project dependencies (RDKit, PyTorch, PyTorch Geometric, etc.) pre-installed as specified in `environment.yml`. This might take some time on the first run as it downloads all packages.
@@ -179,6 +178,7 @@ Project Structure
 ├── Dockerfile                      # Defines the Docker image for the project environment
 ├── environment.yml                 # Conda environment definition with all dependencies
 ├── config.yaml                     # Main configuration file for the data pipeline
+├── data_utils.py                   # General utility functions for data processing and validation
 ├── main.py                         # Entry point for running the dataset processing
 ├── vqm24_dataset.py                # Implements the torch_geometric.data.InMemoryDataset for VQM24
 ├── mol_conversion.py               # Orchestrates RDKit -> PyG Data conversion and enrichment
