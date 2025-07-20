@@ -299,3 +299,37 @@ class StructuralFeatureError(MoleculeProcessingError):
                 msg += f", Feature Name: {self.feature_name}"
             msg += ")"
         return msg
+
+class VibrationRefinementError(DataProcessingError):
+    """
+    Exception raised when an error occurs during the refinement of
+    molecular vibrations (frequencies and vibmodes).
+    """
+    def __init__(self, message: str = "Error during molecular vibration refinement.",
+                 molecule_index: Optional[int] = None,
+                 reason: Optional[str] = None,
+                 detail: Optional[str] = None) -> None:
+        """
+        Initializes the VibrationRefinementError.
+
+        Args:
+            message (str): A general message about the vibration refinement failure.
+            molecule_index (Optional[int]): The index of the molecule being processed.
+            reason (Optional[str]): The reason for the refinement failure.
+            detail (Optional[str]): Specific details about the error.
+        """
+        super().__init__(message=message, item_identifier=f"Mol {molecule_index}" if molecule_index is not None else None, details=reason)
+        self.molecule_index: Optional[int] = molecule_index
+        self.reason: Optional[str] = reason
+        self.detail: Optional[str] = detail
+
+    def __str__(self) -> str:
+        msg: str = f"Error during molecular vibration refinement"
+        if self.molecule_index is not None:
+            msg += f" for Molecule (Index: {self.molecule_index})"
+        if self.reason:
+            msg += f": {self.reason}"
+        if self.detail:
+            msg += f". Details: {self.detail}"
+        return msg
+

@@ -25,6 +25,7 @@ from torch_geometric.data import InMemoryDataset, Data
 from torch_geometric.transforms import Compose
 from tqdm import tqdm
 from typing import Optional, Dict, Any, List, Tuple, Union
+from torch.nn.utils.rnn import pad_sequence
 
 import multiprocessing
 
@@ -291,6 +292,44 @@ class VQM24Dataset(InMemoryDataset):
 
         self.logger.info(f"Created PyG pre-transform pipeline with {len(transforms_list)} transforms.")
         return Compose(transforms_list)
+    
+
+    def collate(self, data_list):
+        """
+        Custom collation function for VQM24Dataset.
+        Handles variable-length attributes like 'vibmodes' using pad_sequence.
+        Corrects unpacking of torch_geometric.data.collate.collate return value.
+        """
+        # Use PyTorch Geometric's default collate for most attributes
+        # IMPORTANT: It returns (data, slices)
+        data_batch, slices, _ = torch_geometric.data.collate.collate( # CORRECTED LINE: Unpack data_batch, slices, AND incs
+            data_list[0].__class__,
+            data_list,
+            exclude_keys=['vibmodes'] # Exclude vibmodes from default collation
+        )
+
+        # Custom collation for 'vibmodes'
+        all_vib_tensors_in_batch = []
+        vib_mode_counts = [] # To keep track of how many vibmodes each molecule had
+
+        for data in data_list:
+            if hasattr(data, 'vibmodes') and data.vibmodes is not None and len(data.vibmodes) > 0:
+                all_vib_tensors_in_batch.extend(data.vibmodes)
+                vib_mode_counts.append(len(data.vibmodes))
+            else:
+                vib_mode_counts.append(0)
+
+        if len(all_vib_tensors_in_batch) > 0:
+            padded_vibmodes = pad_sequence(all_vib_tensors_in_batch, batch_first=True)
+        else:
+            padded_vibmodes = torch.empty(0, 3, dtype=torch.float32)
+
+        # Assign the custom collated 'vibmodes' to the batched Data object
+        data_batch.vibmodes = padded_vibmodes # CORRECTED LINE: Assign to data_batch
+        data_batch.vibmode_counts = torch.tensor(vib_mode_counts, dtype=torch.long)
+
+        # Return both the batched Data object and the slices dictionary
+        return data_batch, slices # CORRECTED LINE: Return both elements
 
 
     @property

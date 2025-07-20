@@ -40,7 +40,8 @@ class MoleculeDataConverter:
     """
     def __init__(self,
                  logger: logging.Logger,
-                 structural_features_config: Dict[str, Any] = None):
+                 structural_features_config: Dict[str, Any] = None,
+                 data_config: Dict[str, Any] = None):
 
         """
         Initializes the MoleculeDataConverter with a logger instance.

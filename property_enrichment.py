@@ -23,7 +23,7 @@ from torch_geometric.data import Data
 
 from config import HAR2EV, ATOMIC_ENERGIES_HARTREE
 from data_utils import _is_value_valid_and_not_nan
-
+from data_refining import refine_molecular_vibrations
 from exceptions import PropertyEnrichmentError, ConfigurationError
 
 
@@ -359,12 +359,14 @@ def add_vector_graph_properties(
             ) from e
 
 
+
 def add_variable_len_graph_properties(
     pyg_data: Data,
     raw_properties_dict: Dict[str, Union[np.ndarray, None]],
     molecule_index: int,
     logger: logging.Logger,
-    property_keys: List[str]
+    property_keys: List[str],
+    data_config: Dict[str, Any] # <--- ADD data_config as an argument here
 ) -> None:
     """
     Adds specified graph-level properties that can have a variable number of elements
@@ -381,7 +383,7 @@ def add_variable_len_graph_properties(
         molecule_index (int): The index of the molecule being processed.
         logger (logging.Logger): The logger instance.
         property_keys (list): A list of string keys for the variable-length properties to add.
-
+        data_config (Dict[str, Any]): The configuration dictionary for data processing. # <--- ADD THIS DOCSTRING
     Raises:
         PropertyEnrichmentError: If a property is missing, invalid, or has an unexpected format/shape.
     """
@@ -395,10 +397,66 @@ def add_variable_len_graph_properties(
             reason="No nodes found for variable-length graph properties."
         )
 
+    # Get comparison_tolerance from data_config, with a default value
+    refinement_tolerance = data_config.get('vibration_refinement', {}).get('comparison_tolerance', 1e-4) # <--- ADD THIS LINE
+
+    raw_freqs_data = None
+    raw_vibmodes_data = None
+
+    # First, extract freqs and vibmodes if they are among the keys to process
+    # This ensures we have both before attempting refinement
+    if 'freqs' in property_keys:
+        raw_freqs_data = raw_properties_dict.get('freqs')
+        # The previous 'if' block with the warning is completely removed for 'freqs'.
+
+    if 'vibmodes' in property_keys:
+        raw_vibmodes_data = raw_properties_dict.get('vibmodes')
+        # The previous 'if' block with the warning is completely removed for 'vibmodes'.
+
+    # --- NEW: Call refinement for freqs and vibmodes if both are present and valid for processing ---
+    if raw_freqs_data is not None and raw_vibmodes_data is not None:
+        logger.debug(f"Molecule {molecule_index}: Attempting to refine frequencies and vibmodes.")
+        try:
+            cleaned_freqs, cleaned_vibmodes, is_accepted = refine_molecular_vibrations(
+                freqs=raw_freqs_data,
+                vibmodes=raw_vibmodes_data,
+                comparison_tolerance=refinement_tolerance
+            )
+
+            if not is_accepted:
+                raise PropertyEnrichmentError(
+                    molecule_index=molecule_index,
+                    inchi=inchi,
+                    property_name="freqs_and_vibmodes",
+                    reason=(f"Vibrational data refinement rejected for molecule {molecule_index}. "
+                            f"Cleaned freqs count ({len(cleaned_freqs)}) does not match vibmodes count ({len(cleaned_vibmodes)}).")
+                )
+            logger.info(f"Molecule {molecule_index}: Successfully refined freqs ({len(cleaned_freqs)}) and vibmodes ({len(cleaned_vibmodes)}).")
+
+            # Update raw_properties_dict with the refined data to be used downstream
+            # This ensures subsequent processing uses the cleaned data
+            raw_properties_dict['freqs'] = np.array(cleaned_freqs, dtype=raw_freqs_data.dtype) # Convert back to numpy array if needed
+            raw_properties_dict['vibmodes'] = cleaned_vibmodes # Keep as list of arrays/tensors for vibmodes
+
+        except Exception as e:
+            raise PropertyEnrichmentError(
+                molecule_index=molecule_index,
+                inchi=inchi,
+                property_name="freqs_and_vibmodes_refinement",
+                reason=f"Error during vibrational data refinement for molecule {molecule_index}.",
+                detail=str(e)
+            ) from e
+    else:
+        logger.info(f"Molecule {molecule_index}: Skipping vibrational data refinement as 'freqs' or 'vibmodes' are missing/invalid in raw data.")
+
+
+    # Now iterate through the property_keys, and for 'freqs' and 'vibmodes',
+    # use the *potentially refined* values from raw_properties_dict
     for key in property_keys:
         try:
             # --- Direct access from raw_properties_dict ---
-            value = raw_properties_dict.get(key)
+            # Value now refers to potentially refined data if freqs/vibmodes were refined
+            value = raw_properties_dict.get(key) # <--- THIS NOW GETS THE REFINED DATA FOR FREQS/VIBMODES
 
             # General validity check for all variable-length properties first
             if not _is_value_valid_and_not_nan(value):
@@ -406,7 +464,7 @@ def add_variable_len_graph_properties(
                     molecule_index=molecule_index,
                     inchi=inchi,
                     property_name=key, # Add property_name
-                    reason=f"Missing, invalid, or NaN variable-length property '{key}'."
+                    reason=f"Missing, invalid, or NaN variable-length property '{key}' after potential refinement." # Updated message
                 )
 
             if key == 'vibmodes':
@@ -421,8 +479,40 @@ def add_variable_len_graph_properties(
                     )
 
                 # Ensure vibmodes data is a 3D NumPy array (num_modes, num_atoms, 3)
+                # If refinement output 'cleaned_vibmodes' as list, ensure it's handled.
                 reshaped_value = None
-                if isinstance(value, np.ndarray) and value.ndim == 2 and value.shape[1] == 3:
+                if isinstance(value, list) and all(isinstance(v, (np.ndarray, list)) for v in value):
+                    # If 'value' is a list of arrays (output from refinement), ensure they are consistent
+                    if value and all(isinstance(v, np.ndarray) and v.ndim == 2 and v.shape[1] == 3 and v.shape[0] == num_atoms for v in value):
+                        # Convert list of 2D arrays to single 3D numpy array for consistency if needed, then reshape
+                        # Or directly process list of arrays as list of tensors
+                        reshaped_value = np.array(value) # Convert back to numpy array of arrays
+                        if reshaped_value.ndim == 2 and reshaped_value.shape[1] == 3: # Case where it's (num_modes*num_atoms, 3)
+                            if reshaped_value.shape[0] % num_atoms != 0:
+                                raise PropertyEnrichmentError(
+                                    molecule_index=molecule_index,
+                                    inchi=inchi,
+                                    property_name=key,
+                                    reason=f"'vibmodes' array has shape {reshaped_value.shape}, but first dimension ({reshaped_value.shape[0]}) is not a multiple of num_nodes ({num_atoms}). Cannot reshape to (num_modes, num_nodes, 3) after refinement."
+                                )
+                            num_modes = reshaped_value.shape[0] // num_atoms
+                            reshaped_value = reshaped_value.reshape(num_modes, num_atoms, 3)
+                        elif reshaped_value.ndim != 3 or reshaped_value.shape[1] != num_atoms or reshaped_value.shape[2] != 3:
+                             raise PropertyEnrichmentError(
+                                molecule_index=molecule_index,
+                                inchi=inchi,
+                                property_name=key,
+                                reason=f"Refined 'vibmodes' list could not be converted to expected 3D format: {reshaped_value.shape}."
+                            )
+                    else: # If not all elements are correct numpy arrays
+                        raise PropertyEnrichmentError(
+                            molecule_index=molecule_index,
+                            inchi=inchi,
+                            property_name=key,
+                            reason=f"Refined 'vibmodes' list contains non-array elements or arrays of incorrect shape/dimensions."
+                        )
+
+                elif isinstance(value, np.ndarray) and value.ndim == 2 and value.shape[1] == 3:
                     # Case: (num_modes * num_atoms, 3)
                     if value.shape[0] % num_atoms != 0:
                         raise PropertyEnrichmentError(
@@ -443,18 +533,18 @@ def add_variable_len_graph_properties(
                         molecule_index=molecule_index,
                         inchi=inchi,
                         property_name=key, # Add property_name
-                        reason=f"'vibmodes' array has unexpected NumPy array format or type: {value.shape if isinstance(value, np.ndarray) else type(value)}."
+                        reason=f"'vibmodes' array has unexpected NumPy array format or type after potential refinement: {value.shape if isinstance(value, np.ndarray) else type(value)}." # Updated message
                     )
 
                 # Store vibmodes as a Python list of tensors, one tensor per mode.
-                # This prevents PyTorch Geometric's `collate` from attempting to `torch.cat`
-                # across the varying `num_modes` dimension, avoiding the `RuntimeError`.
-                vibmodes_list_of_tensors = [torch.tensor(mode_data, dtype=torch.float) for mode_data in reshaped_value]
+                vibmodes_list_of_tensors = [torch.tensor(mode_data.astype(np.float32), dtype=torch.float32) for mode_data in reshaped_value]
+
                 setattr(pyg_data, key, vibmodes_list_of_tensors)
 
                 continue # Skip to the next property_key in the loop
 
             # This block handles all *other* variable-length properties (e.g., 'freqs')
+            # Use the refined 'freqs' directly here
             dtype = torch.complex64 if 'freq' in key else torch.float
             setattr(pyg_data, key, torch.tensor(value, dtype=dtype))
 
@@ -466,7 +556,7 @@ def add_variable_len_graph_properties(
                 molecule_index=molecule_index,
                 inchi=inchi,
                 property_name=key, # Add property_name
-                reason=f"Error fetching variable-length property '{key}'.",
+                reason=f"Error fetching variable-length property '{key}' after potential refinement.", # Updated message
                 detail=str(e)
             ) from e
 
@@ -721,7 +811,8 @@ def enrich_pyg_data_with_properties(
 
         # 5. Add variable-length graph properties
         # Pass raw_properties_dict
-        add_variable_len_graph_properties(pyg_data, raw_properties_dict, mol_idx, logger, variable_len_graph_properties_to_include)
+        add_variable_len_graph_properties(pyg_data, raw_properties_dict, mol_idx, logger, variable_len_graph_properties_to_include, data_config)
+
 
     # Catch specific PropertyEnrichmentError and ConfigurationError
     except (PropertyEnrichmentError, ConfigurationError):
