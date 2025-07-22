@@ -5,230 +5,329 @@
 [![Docker](https://img.shields.io/badge/Docker-ready-blue.svg?logo=docker&logoColor=white)](https://www.docker.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+## Overview
+
+This repository provides a robust and configurable data processing pipeline for the **VQM24 (Virtual Quantum Mechanical Property Prediction)** dataset, specifically designed for use with **PyTorch Geometric (PyG)**. The pipeline handles the entire workflow from raw data acquisition to creating production-ready `torch_geometric.data.Data` objects with comprehensive molecular features and properties.
+
 ## Table of Contents
 
-* [Project Description](#project-description)
-* [Features](#features)
-* [Installation](#installation)
-* [Usage](#usage)
-* [Configuration](#configuration)
-* [Project Structure](#project-structure)
-* [Citation](#citation)
-* [Acknowledgements](#acknowledgements)
-
-## Project Description
-
-This repository provides a robust and configurable data processing pipeline for the **VQM24 (Virtual Quantum Mechanical Property Prediction)** dataset, designed specifically for use with **PyTorch Geometric (PyG)**. The pipeline handles the entire process from raw data acquisition (downloading from Zenodo) to the creation of ready-to-use `torch_geometric.data.Data` objects, incorporating various pre-filtering, feature engineering, and transformation steps.
+- [Features](#features)
+- [Quick Start](#quick-start)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Configuration](#configuration)
+- [Project Structure](#project-structure)
+- [Examples](#examples)
+- [Contributing](#contributing)
+- [Citation](#citation)
+- [License](#license)
+- [Acknowledgements](#acknowledgements)
 
 ## Features
 
-* **Automated Data Acquisition**: Seamlessly downloads the VQM24 dataset from a specified URL (e.g., Zenodo).
-* **Chunked Data Processing**: Efficiently processes large datasets by loading and processing data in configurable chunks, optimizing memory usage.
-* **Configurable Pre-filtering**:
-    * **Atom Count Filters**: Filter molecules based on minimum and maximum atom counts.
-    * **Heavy Atom Filters**: Include or exclude molecules based on the presence or absence of specified heavy atoms (e.g., `C`, `N`, `O`, `F`, `Br`, `Cl`, `P`, `S`, `Si`).
-* **Molecular Data Conversion**: Converts raw molecular data (SMILES, coordinates, atomic numbers) into RDKit molecule objects.
-* **PyTorch Geometric Data Object Creation**: Transforms RDKit molecules into `torch_geometric.data.Data` objects, including atom positions (`pos`) and atomic numbers (`z`).
-* **Extensive Property Enrichment**: Adds various molecular properties to the PyG Data objects, including:
-    * **Scalar Graph Targets**: `homo_hartree`, `lumo_hartree`, `gap_hartree`, `dipole_moment_debye`, `total_energy_hartree`, `energy_atomization_hartree`
-    * **Node-level Features**: (e.g., `atom_types`, `partial_charges`)
-    * **Graph-level Vector Properties**: (e.g., `eigenvalues`, `frequencies`, `vibmodes`)
-    * **Derived Properties**: Calculates atomization energy based on atomic energies.
-* **Vibrational Data Refinement**: Cleans and refines vibrational frequencies and modes, handling invalid entries, near-zero frequencies, and ensuring unique (frequency, vibmode) pairs.
-* **Structural Feature Engineering**: Adds configurable atom-level (`x`) and bond-level (`edge_attr`) structural features derived from RDKit molecules, such as atom degree, hybridization, formal charge, number of radical electrons, bond type, and bond direction.
-* **PyG Pre-Transformations**: Supports the application of standard PyTorch Geometric `pre_transform` operations defined in the configuration, such as `OneHotDegree`.
-* **Robust Error Handling**: Implements a comprehensive custom exception hierarchy to gracefully manage various issues, including configuration errors, data processing errors, RDKit conversion failures, and filtering rejections.
-* **Centralized Logging**: Configurable logging system to record processing steps, warnings, and errors, with output to both console and a log file.
-* **Modular Design**: Structured into multiple Python modules (`config`, `data_refining`, `data_utils`, `exceptions`, `logging_config`, `mol_conversion`, `molecule_filters`, `mol_structural_features`, `property_enrichment`, `vqm24_dataset`) for clarity and maintainability.
+### 🚀 **Core Capabilities**
+- **Automated Data Acquisition**: Seamlessly downloads VQM24 dataset from Zenodo
+- **Memory-Efficient Processing**: Chunked data processing for handling large datasets
+- **Flexible Filtering**: Configurable pre-filtering based on atom counts and heavy atom types
+
+### 🔬 **Molecular Data Processing**
+- **RDKit Integration**: Converts raw molecular data (SMILES, coordinates, atomic numbers) to RDKit objects
+- **PyG Data Creation**: Transforms molecules into `torch_geometric.data.Data` objects
+- **Rich Property Enrichment**: Adds comprehensive molecular properties including:
+  - Scalar targets: HOMO/LUMO energies, dipole moments, total energies
+  - Node features: Atom types, partial charges
+  - Graph properties: Eigenvalues, vibrational frequencies and modes
+  - Derived properties: Atomization energies
+
+### ⚙️ **Advanced Features**
+- **Vibrational Data Refinement**: Cleans frequencies and modes, handles invalid entries
+- **Structural Feature Engineering**: Configurable atom and bond-level features
+- **PyG Transformations**: Built-in support for standard PyG pre-transforms
+- **Robust Error Handling**: Comprehensive exception hierarchy for graceful error management
+- **Centralized Logging**: Configurable logging with console and file output
+
+## Quick Start
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/vqm24-pytorch-geometric.git
+cd vqm24-pytorch-geometric
+
+# Create conda environment
+conda env create -f environment.yml
+conda activate shah_env
+
+# Run the processing pipeline
+python main.py
+```
 
 ## Installation
 
-This project uses `conda` for environment management.
+### Prerequisites
+- Python 3.11+
+- Conda or Miniconda
 
-1.  **Clone the repository:**
-    ```bash
-    git clone [https://github.com/your_username/your_repository_name.git](https://github.com/your_username/your_repository_name.git)
-    cd your_repository_name
-    ```
-2.  **Create and activate the conda environment:**
-    A basic `environment.yml` would typically look like this, including the core dependencies inferred from the project:
+### Environment Setup
 
-    ```yaml
-    name: shah_env
-    channels:
-      - pytorch
-      - pyg
-      - conda-forge
-      - defaults
-    dependencies:
-      - python=3.11
-      - numpy
-      - pytorch
-      - cpuonly # Or cudatoolkit=X.X if you have a GPU
-      - rdkit
-      - pyyaml
-      - scipy
-      - torch-geometric
-      - pandas
-      - matplotlib
-      - tqdm
-      - requests
-    ```
-    Create the environment using the `environment.yml` (if provided and populated) or by manually installing:
-    ```bash
-    # If you have a populated environment.yml:
-    conda env create -f environment.yml
-    conda activate shah_env
-    ```
-    **Alternatively, if `environment.yml` is empty or missing, install manually:**
-    ```bash
-    conda create -n shah_env python=3.11 numpy pytorch cpuonly rdkit pyyaml scipy torch-geometric pandas matplotlib tqdm requests -c pytorch -c pyg -c conda-forge -c defaults
-    conda activate shah_env
-    ```
-    *(Note: For GPU support, replace `cpuonly` with `cudatoolkit=X.X` where `X.X` matches your CUDA version, and ensure you install the correct PyTorch version for CUDA.)*
+1. **Clone the repository:**
+   ```bash
+   git clone git@github.com:shahram-boshra/vqm24_database_process.git
+   cd vqm24-pytorch-geometric
+   ```
+
+2. **Create conda environment:**
+   ```bash
+   conda env create -f environment.yml
+   conda activate shah_env
+   ```
+
+   **Alternative manual installation:**
+   ```bash
+   conda create -n shah_env python=3.11 \
+     numpy pytorch cpuonly rdkit pyyaml scipy \
+     torch-geometric pandas matplotlib tqdm requests \
+     -c pytorch -c pyg -c conda-forge -c defaults
+   conda activate shah_env
+   ```
+
+   > **Note:** For GPU support, replace `cpuonly` with `cudatoolkit=X.X` matching your CUDA version.
+
+### Docker Support
+```bash
+# Build Docker image
+docker build -t vqm24-processor .
+
+# Run container
+docker run -v $(pwd)/data:/app/data vqm24-processor
+```
 
 ## Usage
 
-To process the VQM24 dataset and generate the PyTorch Geometric dataset, run the `main.py` script:
+### Basic Usage
+
+Run the complete processing pipeline:
 
 ```bash
 python main.py
+```
 
-The script will:
+The pipeline will:
+1. Initialize logging and load configurations
+2. Download raw data (`DFT_all.npz`) to `~/Chem_Data/VQM24_PyG_Dataset/raw/`
+3. Process data in chunks with filtering and feature engineering
+4. Save processed dataset as `data.pt` in `~/Chem_Data/VQM24_PyG_Dataset/processed/`
+5. Perform integrity tests on the processed data
 
-    Initialize logging.
+### Loading Processed Dataset
 
-    Load configurations from config.yaml.
-
-    Download the DFT_all.npz raw data file into ~/Chem_Data/VQM24_PyG_Dataset/raw/ if it doesn't exist.
-
-    Process the data in chunks, applying filters, converting molecules, enriching properties, and applying PyG transformations.
-
-    Save the final processed dataset as data.pt in ~/Chem_Data/VQM24_PyG_Dataset/processed/.
-
-    Perform a quick integrity test on a sample from the processed dataset.
-
-Detailed logs will be printed to the console and saved to a log file (e.g., main.log) in the same directory as main.py.
-
-Example of loading the processed dataset
-
-Once main.py has run successfully and generated data.pt, you can load the dataset as follows:
-Python
-
+```python
 import torch
 from torch_geometric.data import InMemoryDataset
 from pathlib import Path
 
-# Define the dataset root directory where data.pt is saved
-dataset_root_dir = Path.home() / "Chem_Data" / "VQM24_PyG_Dataset"
+# Define dataset path
+dataset_root = Path.home() / "Chem_Data" / "VQM24_PyG_Dataset"
 
-# Instantiate the VQM24Dataset to load the processed data
-# You don't need to pass all configs for loading if data.pt already exists
-# (force_reload=False is implicit if the file exists and is_processed returns True)
-class LoadedVQM24Dataset(InMemoryDataset):
-    def __init__(self, root, transform=None, pre_transform=None, pre_filter=None):
-        super().__init__(root, transform, pre_transform, pre_filter)
+class VQM24Dataset(InMemoryDataset):
+    def __init__(self, root, transform=None, pre_transform=None):
+        super().__init__(root, transform, pre_transform)
         self.data, self.slices = torch.load(self.processed_paths[0])
-
+    
     @property
     def raw_file_names(self):
-        return ['DFT_all.npz'] # Name of the raw file
-
+        return ['DFT_all.npz']
+    
     @property
     def processed_file_names(self):
-        return ['data.pt'] # Name of the processed file
+        return ['data.pt']
 
-    def download(self):
-        # No need to download if already processed
-        pass
+# Load dataset
+dataset = VQM24Dataset(root=str(dataset_root))
+print(f"Loaded {len(dataset)} molecular graphs")
 
-    def process(self):
-        # No need to process if already processed
-        pass
+# Access sample data
+sample = dataset[0]
+print(f"Atoms: {sample.z.shape[0]}")
+print(f"Features: {sample.x.shape if hasattr(sample, 'x') else 'None'}")
+```
 
-# Load the dataset
-loaded_dataset = LoadedVQM24Dataset(root=str(dataset_root_dir))
+## Configuration
 
-print(f"Dataset loaded: {loaded_dataset}")
-print(f"Number of graphs: {len(loaded_dataset)}")
+The `config.yaml` file controls all aspects of the processing pipeline:
 
-# Access a sample graph
-sample_graph = loaded_dataset[0]
-print(f"First graph: {sample_graph}")
-print(f"Atomic numbers (z): {sample_graph.z}")
-print(f"Positions (pos): {sample_graph.pos}")
-if hasattr(sample_graph, 'y') and sample_graph.y is not None:
-    print(f"Targets (y): {sample_graph.y}")
-if hasattr(sample_graph, 'x') and sample_graph.x is not None:
-    print(f"Atom features (x): {sample_graph.x.shape}")
-if hasattr(sample_graph, 'edge_attr') and sample_graph.edge_attr is not None:
-    print(f"Bond features (edge_attr): {sample_graph.edge_attr.shape}")
+### Key Configuration Sections
 
-Configuration
+```yaml
+# Global constants and conversions
+global_constants:
+  har2ev: 27.211386245988
 
-The config.yaml file is central to customizing the data processing pipeline. It allows you to define:
+# Atomic energies for atomization calculations
+atomic_energies_hartree:
+  H: -0.500607632585
+  C: -37.8302333826
+  # ... more elements
 
-    global_constants: Factors like har2ev for energy conversions.
+# Data properties to extract
+data_properties_to_include:
+  scalar_graph_targets:
+    - homo_hartree
+    - lumo_hartree
+    - gap_hartree
+  
+# Filtering configuration
+filter_config:
+  max_atoms: 50
+  min_atoms: 3
+  heavy_atom_filter:
+    mode: "include_only"
+    atoms: ["C", "N", "O", "F"]
 
-    atomic_energies_hartree: Atomic energies used in atomization energy calculations.
+# Structural features
+structural_features:
+  atom_features:
+    - degree
+    - hybridization
+    - formal_charge
+  bond_features:
+    - bond_type
+    - bond_dir
 
-    heavy_atom_symbols_to_z: Mapping for atom filtering.
+# PyG transformations
+transformations:
+  - name: "OneHotDegree"
+    kwargs:
+      max_degree: 10
+```
 
-    data_properties_to_include: Specifies which raw properties from the NPZ file should be extracted and added to the PyG Data object at various levels (scalar graph targets, node features, vector graph properties, variable-length graph properties).
+For detailed configuration options, see the commented `config.yaml` file.
 
-    filter_config: Rules for pre-filtering molecules (e.g., max_atoms, min_atoms, heavy_atom_filter with mode and atoms).
+## Project Structure
 
-    structural_features: Configures which atom-level and bond-level features to compute and add to pyg_data.x and pyg_data.edge_attr respectively.
+```
+vqm24-pytorch-geometric/
+├── config.py                    # Configuration management
+├── config.yaml                  # Main configuration file
+├── data_refining.py             # Vibrational data cleaning
+├── data_utils.py                # Data validation utilities
+├── exceptions.py                # Custom exception classes
+├── logging_config.py            # Logging configuration
+├── main.py                      # Main processing script
+├── mol_conversion.py            # Molecule conversion orchestration
+├── mol_conversion_utils.py      # RDKit and PyG utilities
+├── molecule_filters.py          # Pre-filtering logic
+├── mol_structural_features.py   # Structural feature extraction
+├── property_enrichment.py       # Property addition to PyG objects
+├── vqm24_dataset.py            # Main PyG dataset class
+├── environment.yml             # Conda environment
+├── Dockerfile                  # Docker configuration
+└── README.md                   # This file
+```
 
-    transformations: A list of PyTorch Geometric pre_transform operations to apply to the dataset, with support for passing kwargs to the transform constructors (e.g., OneHotDegree).
+## Examples
 
-Review config.yaml for detailed comments and examples of how to customize these settings.
+### Custom Filtering Example
 
-Project Structure
+```python
+# Modify config.yaml for custom filtering
+filter_config:
+  max_atoms: 30
+  min_atoms: 5
+  heavy_atom_filter:
+    mode: "exclude"
+    atoms: ["Br", "I"]  # Exclude bromine and iodine
+```
 
-.
-├── config.py                     # Handles loading and access of application configuration from config.yaml.
-├── config.yaml                   # Main configuration file for dataset processing, filters, and transforms.
-├── data_refining.py              # Functions for cleaning and refining molecular vibrational data (frequencies, vibmodes).
-├── data_refining_test.py         # Script to test the `data_refining` module.
-├── data_utils.py                 # Utility functions for data validation and safe array access.
-├── environment.yml               # Conda environment file listing project dependencies. (Note: user provided an empty file)
-├── exceptions.py                 # Defines custom exception classes for robust error handling.
-├── logging_config.py             # Configures the application's logging system.
-├── main.py                       # Main entry point for dataset processing and testing.
-├── mol_conversion.py             # Orchestrates conversion from raw data to RDKit and PyG Data objects.
-├── mol_conversion_utils.py       # Helper functions for RDKit and PyG Data object creation.
-├── molecule_filters.py           # Implements pre-filtering logic for PyG Data objects based on atom counts and types.
-├── mol_structural_features.py    # Functions for adding atom and bond structural features to PyG Data objects.
-├── property_enrichment.py        # Adds various molecular properties (targets, features) to PyG Data objects.
-├── README.md                     # Project overview and instructions (this file)
-└── vqm24_dataset.py              # Defines the main PyTorch Geometric `InMemoryDataset` class for VQM24.
+### Adding Custom Features
 
-Citation
+```python
+# In mol_structural_features.py, add custom atom features
+def get_custom_atom_feature(atom):
+    """Custom feature: atom electronegativity"""
+    electronegativity_map = {
+        'H': 2.20, 'C': 2.55, 'N': 3.04, 'O': 3.44, 'F': 3.98
+    }
+    return electronegativity_map.get(atom.GetSymbol(), 0.0)
+```
 
-If you use the VQM24 dataset or this processing pipeline in your research, please consider citing the original VQM24 paper:
+### Batch Processing Example
 
+```python
+from torch_geometric.loader import DataLoader
+
+# Create data loader for batch processing
+dataset = VQM24Dataset(root="path/to/dataset")
+loader = DataLoader(dataset, batch_size=32, shuffle=True)
+
+for batch in loader:
+    # Process batch of molecular graphs
+    print(f"Batch size: {batch.num_graphs}")
+    print(f"Total atoms: {batch.x.shape[0] if hasattr(batch, 'x') else 'N/A'}")
+```
+
+## Contributing
+
+We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
+
+### Development Setup
+
+```bash
+# Fork and clone the repository
+git clone https://github.com/yourusername/vqm24-pytorch-geometric.git
+
+# Create development environment
+conda env create -f environment.yml
+conda activate shah_env
+
+# Install in development mode
+pip install -e .
+
+# Run tests
+python -m pytest tests/
+```
+
+### Code Style
+- Follow PEP 8 guidelines
+- Use type hints where appropriate
+- Add docstrings for all public functions
+- Include unit tests for new features
+
+## Citation
+
+If you use this processing pipeline or the VQM24 dataset in your research, please cite:
+
+```bibtex
 @article{li2024vqm24,
   title={VQM24: A New Dataset for Virtual Quantum Mechanical Property Prediction},
   author={Li, Xiaocheng and Guo, Yuzhi and Li, Jiacai and Cai, Jianfeng and Li, Minghao and Peng, Bo and Li, Jie and Yang, Fan and Li, Guangfu and Yang, Zeyi and Li, Jianan and Shao, Bin},
   journal={arXiv preprint arXiv:2402.04631},
   year={2024}
 }
+```
 
-Link: arXiv:2402.04631
+**Paper:** [arXiv:2402.04631](https://arxiv.org/abs/2402.04631)
 
-Acknowledgements
+## License
 
-We would like to express our gratitude to the developers and maintainers of the following open-source libraries and tools, which are integral to this project:
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-    Docker: For providing a robust platform for building, shipping, and running our application in a consistent and reproducible environment.
+## Acknowledgements
 
-    RDKit: For its powerful cheminformatics functionalities, essential for molecular representation and feature extraction.
+We thank the developers and maintainers of the following essential libraries:
 
-    PyTorch & PyTorch Geometric: For providing the robust deep learning framework and graph neural network utilities.
+- **[PyTorch](https://pytorch.org/)** & **[PyTorch Geometric](https://pytorch-geometric.readthedocs.io/)** - Deep learning and graph neural network frameworks
+- **[RDKit](https://www.rdkit.org/)** - Cheminformatics toolkit for molecular processing
+- **[NumPy](https://numpy.org/)** & **[SciPy](https://scipy.org/)** - Fundamental scientific computing
+- **[Docker](https://www.docker.com/)** - Containerization platform
+- **[Tqdm](https://tqdm.github.io/)** - Progress bar utilities
 
-    NumPy: For fundamental numerical operations.
+## Support
 
-    Tqdm: For excellent progress bars, enhancing user experience during data processing.
+- 📖 **Documentation**: Check the inline code documentation and configuration comments
+- 🐛 **Issues**: Report bugs and request features via [GitHub Issues](https://github.com/shahram-boshra/vqm24-pytorch-geometric/issues)
+- 💬 **Discussions**: Join our [GitHub Discussions](https://github.com/shahram-boshra/vqm24-pytorch-geometric/discussions)
+- 📧 **Contact**: For research collaborations, contact [a.boshra@gmail.com](mailto:a.boshra@gmail.com)
 
-    Requests & PyYAML: For handling data downloads and configuration parsing respectively.
+---
+
+**Made with ❤️ for the molecular machine learning community**

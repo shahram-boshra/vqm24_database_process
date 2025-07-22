@@ -83,7 +83,7 @@ def add_scalar_graph_targets(
                     raise PropertyEnrichmentError(
                         molecule_index=molecule_index,
                         inchi=inchi,
-                        property_name=key, # Add property_name
+                        property_name=key, 
                         reason=f"Scalar target '{key}' has unexpected array shape {value.shape} (size {value.size}). Expected a single scalar or a 1-element array."
                     )
             # Case 3: Value is some other unexpected type (or None if not found in dict)
@@ -93,7 +93,7 @@ def add_scalar_graph_targets(
                 raise PropertyEnrichmentError(
                     molecule_index=molecule_index,
                     inchi=inchi,
-                    property_name=key, # Add property_name
+                    property_name=key, 
                     reason=f"Scalar target '{key}' has unexpected type {type(value)} or is missing. Expected a numeric scalar or NumPy array."
                 )
 
@@ -103,7 +103,7 @@ def add_scalar_graph_targets(
                 raise PropertyEnrichmentError(
                     molecule_index=molecule_index,
                     inchi=inchi,
-                    property_name=key, # Add property_name
+                    property_name=key, 
                     reason=f"Scalar target '{key}' has NaN, Inf, or None value after initial conversion."
                 )
 
@@ -119,7 +119,7 @@ def add_scalar_graph_targets(
             raise PropertyEnrichmentError(
                 molecule_index=molecule_index,
                 inchi=inchi,
-                property_name=key, # Add property_name
+                property_name=key, 
                 reason=f"Critical error processing scalar target '{key}'.",
                 detail=str(e)
             ) from e
@@ -187,7 +187,7 @@ def add_node_features(
                 raise PropertyEnrichmentError(
                     molecule_index=molecule_index,
                     inchi=inchi,
-                    property_name=key, # Add property_name
+                    property_name=key, 
                     reason=f"Missing, invalid, or shape mismatch for node feature '{key}' (expected {expected_num_nodes} got {node_values.shape[0] if isinstance(node_values, np.ndarray) else 'N/A'})."
                 )
             else:
@@ -199,7 +199,7 @@ def add_node_features(
             raise PropertyEnrichmentError(
                 molecule_index=molecule_index,
                 inchi=inchi,
-                property_name=key, # Add property_name
+                property_name=key, 
                 reason=f"Error fetching node-level feature '{key}'.",
                 detail=str(e)
             ) from e
@@ -286,7 +286,7 @@ def add_vector_graph_properties(
                 raise PropertyEnrichmentError(
                     molecule_index=mol_idx,
                     inchi=inchi,
-                    property_name=prop_key, # Add property_name
+                    property_name=prop_key, 
                     reason=f"Missing, invalid, or NaN vector property '{prop_key}'."
                 )
 
@@ -294,11 +294,11 @@ def add_vector_graph_properties(
                 raise PropertyEnrichmentError(
                     molecule_index=mol_idx,
                     inchi=inchi,
-                    property_name=prop_key, # Add property_name
+                    property_name=prop_key, 
                     reason=f"Vector property '{prop_key}' is not a 1D array. Actual type: {type(value)}, Actual dims: {getattr(value, 'ndim', 'N/A')}."
                 )
 
-            # --- 'rots' PADDING ---
+            # --- START 'rots' PADDING ---
             if prop_key == 'rots':
                 if value.shape == (2,):
                     # If rots is (2,), pad it to (3,) with a zero
@@ -310,38 +310,38 @@ def add_vector_graph_properties(
                     raise PropertyEnrichmentError(
                         molecule_index=mol_idx,
                         inchi=inchi,
-                        property_name=prop_key, # Add property_name
+                        property_name=prop_key, 
                         reason=f"Vector property '{prop_key}' has unexpected shape {value.shape}. Expected (3,) or (2,)."
                     )
-            # --- END of 'rots' PADDING block ---
+            # --- END 'rots' PADDING block ---
 
             # Explicit shape validation for other specific vector properties
             elif prop_key == 'dipole' and value.shape != (3,):
                 raise PropertyEnrichmentError(
                     molecule_index=mol_idx,
                     inchi=inchi,
-                    property_name=prop_key, # Add property_name
+                    property_name=prop_key, 
                     reason=f"Vector property '{prop_key}' has unexpected shape {value.shape}. Expected (3,)."
                 )
             elif prop_key == 'quadrupole' and value.shape != (6,):
                 raise PropertyEnrichmentError(
                     molecule_index=mol_idx,
                     inchi=inchi,
-                    property_name=prop_key, # Add property_name
+                    property_name=prop_key, 
                     reason=f"Vector property '{prop_key}' has unexpected shape {value.shape}. Expected (6,)."
                 )
             elif prop_key == 'octupole' and value.shape != (10,):
                 raise PropertyEnrichmentError(
                     molecule_index=mol_idx,
                     inchi=inchi,
-                    property_name=prop_key, # Add property_name
+                    property_name=prop_key, 
                     reason=f"Vector property '{prop_key}' has unexpected shape {value.shape}. Expected (10,)."
                 )
             elif prop_key == 'hexadecapole' and value.shape != (15,):
                 raise PropertyEnrichmentError(
                     molecule_index=mol_idx,
                     inchi=inchi,
-                    property_name=prop_key, # Add property_name
+                    property_name=prop_key, 
                     reason=f"Vector property '{prop_key}' has unexpected shape {value.shape}. Expected (15,)."
                 )
 
@@ -353,7 +353,7 @@ def add_vector_graph_properties(
             raise PropertyEnrichmentError(
                 molecule_index=mol_idx,
                 inchi=inchi,
-                property_name=prop_key, # Add property_name
+                property_name=prop_key, 
                 reason=f"Error processing vector property '{prop_key}'.",
                 detail=str(e)
             ) from e
@@ -366,7 +366,7 @@ def add_variable_len_graph_properties(
     molecule_index: int,
     logger: logging.Logger,
     property_keys: List[str],
-    data_config: Dict[str, Any] # <--- ADD data_config as an argument here
+    data_config: Dict[str, Any] 
 ) -> None:
     """
     Adds specified graph-level properties that can have a variable number of elements
@@ -463,8 +463,8 @@ def add_variable_len_graph_properties(
                 raise PropertyEnrichmentError(
                     molecule_index=molecule_index,
                     inchi=inchi,
-                    property_name=key, # Add property_name
-                    reason=f"Missing, invalid, or NaN variable-length property '{key}' after potential refinement." # Updated message
+                    property_name=key, 
+                    reason=f"Missing, invalid, or NaN variable-length property '{key}' after potential refinement." 
                 )
 
             if key == 'vibmodes':
@@ -474,7 +474,7 @@ def add_variable_len_graph_properties(
                     raise PropertyEnrichmentError(
                         molecule_index=molecule_index,
                         inchi=inchi,
-                        property_name=key, # Add property_name
+                        property_name=key, 
                         reason=f"Cannot process 'vibmodes' for index {molecule_index}: num_nodes is 0."
                     )
 
@@ -518,7 +518,7 @@ def add_variable_len_graph_properties(
                         raise PropertyEnrichmentError(
                             molecule_index=molecule_index,
                             inchi=inchi,
-                            property_name=key, # Add property_name
+                            property_name=key, 
                             reason=f"'vibmodes' array has shape {value.shape}, but first dimension ({value.shape[0]}) is not a multiple of num_nodes ({num_atoms}). Cannot reshape to (num_modes, num_nodes, 3)."
                         )
                     num_modes = value.shape[0] // num_atoms
@@ -532,7 +532,7 @@ def add_variable_len_graph_properties(
                     raise PropertyEnrichmentError(
                         molecule_index=molecule_index,
                         inchi=inchi,
-                        property_name=key, # Add property_name
+                        property_name=key, 
                         reason=f"'vibmodes' array has unexpected NumPy array format or type after potential refinement: {value.shape if isinstance(value, np.ndarray) else type(value)}." # Updated message
                     )
 
@@ -555,7 +555,7 @@ def add_variable_len_graph_properties(
             raise PropertyEnrichmentError(
                 molecule_index=molecule_index,
                 inchi=inchi,
-                property_name=key, # Add property_name
+                property_name=key, 
                 reason=f"Error fetching variable-length property '{key}' after potential refinement.", # Updated message
                 detail=str(e)
             ) from e
@@ -666,7 +666,7 @@ def add_derived_graph_targets(
             raise PropertyEnrichmentError(
                 molecule_index=molecule_index,
                 inchi=inchi,
-                property_name=atomization_energy_base_key, # Add property_name
+                property_name=atomization_energy_base_key, 
                 reason=f"Cannot calculate atomization energy: Base energy '{atomization_energy_base_key}' is missing or invalid."
             )
         # Ensure it's a float scalar
@@ -676,7 +676,7 @@ def add_derived_graph_targets(
             raise PropertyEnrichmentError(
                 molecule_index=molecule_index,
                 inchi=inchi,
-                property_name=atomization_energy_base_key, # Add property_name
+                property_name=atomization_energy_base_key, 
                 reason=f"Cannot calculate atomization energy: Base energy '{atomization_energy_base_key}' has unexpected type {type(molecular_total_energy_hartree)}."
             )
 

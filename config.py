@@ -7,7 +7,8 @@ convenient access to frequently used constants.
 """
 import yaml
 import os
-from typing import Dict, Any, Optional, Union
+from typing import Dict, Any, Optional, Union, Tuple
+
 
 from exceptions import ConfigurationError, AtomFilterError
 
@@ -96,4 +97,11 @@ HEAVY_ATOM_SYMBOLS_TO_Z: Dict[str, int] = _get_config_value(_TEMP_CONFIG, 'heavy
 # Access 'global_constants' dictionary first, then its 'har2ev' key
 global_constants: Dict[str, Any] = _get_config_value(_TEMP_CONFIG, 'global_constants', dict)
 HAR2EV: Union[int, float] = _get_config_value(global_constants, 'har2ev', (int, float), parent_key='global_constants')
+
+# Dataset Configuration Constants
+DATASET_CONFIG: Dict[str, Any] = _get_config_value(_TEMP_CONFIG, 'dataset_config', dict)
+RAW_NPZ_FILENAME: str = _get_config_value(DATASET_CONFIG, 'raw_npz_filename', str)
+RAW_NPZ_DOWNLOAD_URL: Optional[str] = _get_config_value(DATASET_CONFIG, 'raw_npz_download_url', (str, type(None))) # Allow str or None
+DATASET_ROOT_DIR: str = _get_config_value(DATASET_CONFIG, 'dataset_root_dir', str)
+
 

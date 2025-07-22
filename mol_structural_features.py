@@ -177,7 +177,7 @@ def _is_bond_in_any_ring(bond: Chem.Bond) -> int:
 
 # --- Aggregation functions for atom and bond features ---
 def _calculate_atom_features_tensor(rdkit_mol: Chem.Mol, selected_features: List[str],
-                                     molecule_index: Optional[int] = None, inchi: Optional[str] = None) -> torch.Tensor: # MODIFIED: smiles -> inchi
+                                     molecule_index: Optional[int] = None, inchi: Optional[str] = None) -> torch.Tensor: 
     """
     Calculates atom features based on a list of selected feature names and returns them as a PyTorch tensor.
 
@@ -185,7 +185,7 @@ def _calculate_atom_features_tensor(rdkit_mol: Chem.Mol, selected_features: List
         rdkit_mol (Chem.Mol): The RDKit molecule object.
         selected_features (List[str]): A list of string names for the atom features to calculate (e.g., "degree", "hybridization").
         molecule_index (Optional[int]): The index of the molecule in the dataset, for error context. Defaults to None.
-        inchi (Optional[str]): The InChI string of the molecule, for error context. Defaults to None. # MODIFIED: smiles -> inchi
+        inchi (Optional[str]): The InChI string of the molecule, for error context. Defaults to None. 
 
     Returns:
         torch.Tensor: A tensor of atom features, where each row corresponds to an atom
@@ -222,7 +222,7 @@ def _calculate_atom_features_tensor(rdkit_mol: Chem.Mol, selected_features: List
                     raise StructuralFeatureError(
                         message=f"Error calculating '{feature_name}' for atom {i}.",
                         molecule_index=molecule_index,
-                        inchi=inchi, # MODIFIED: smiles -> inchi
+                        inchi=inchi, 
                         feature_type="atom",
                         feature_name=feature_name,
                         reason=f"Failed to retrieve feature value for atom {i}.",
@@ -233,7 +233,7 @@ def _calculate_atom_features_tensor(rdkit_mol: Chem.Mol, selected_features: List
                 raise StructuralFeatureError(
                     message=f"Unsupported atom feature requested: '{feature_name}'.",
                     molecule_index=molecule_index,
-                    inchi=inchi, # MODIFIED: smiles -> inchi
+                    inchi=inchi, 
                     feature_type="atom",
                     feature_name=feature_name,
                     reason="Invalid feature configuration.",
@@ -255,7 +255,7 @@ def _calculate_atom_features_tensor(rdkit_mol: Chem.Mol, selected_features: List
         raise StructuralFeatureError(
             message="Failed to convert atom features to a PyTorch tensor.",
             molecule_index=molecule_index,
-            inchi=inchi, # MODIFIED: smiles -> inchi
+            inchi=inchi, 
             feature_type="atom",
             reason="Inconsistent feature vector lengths or invalid data.",
             detail=str(e)
@@ -263,7 +263,7 @@ def _calculate_atom_features_tensor(rdkit_mol: Chem.Mol, selected_features: List
 
 
 def _calculate_bond_features_tensor(rdkit_mol: Chem.Mol, pyg_edge_index: torch.Tensor, selected_features: List[str],
-                                     molecule_index: Optional[int] = None, inchi: Optional[str] = None) -> torch.Tensor: # MODIFIED: smiles -> inchi
+                                     molecule_index: Optional[int] = None, inchi: Optional[str] = None) -> torch.Tensor:
     """
     Calculates bond features based on a list of selected feature names and returns them as a PyTorch tensor.
     Ensures features align with the provided PyTorch Geometric edge_index (bidirectional).
@@ -274,7 +274,7 @@ def _calculate_bond_features_tensor(rdkit_mol: Chem.Mol, pyg_edge_index: torch.T
                                          representing graph connectivity.
         selected_features (List[str]): A list of string names for the bond features to calculate (e.g., "bond_type", "is_aromatic").
         molecule_index (Optional[int]): The index of the molecule in the dataset, for error context. Defaults to None.
-        inchi (Optional[str]): The InChI string of the molecule, for error context. Defaults to None. # MODIFIED: smiles -> inchi
+        inchi (Optional[str]): The InChI string of the molecule, for error context. Defaults to None. 
 
     Returns:
         torch.Tensor: A tensor of bond features, where each row corresponds to an edge in `pyg_edge_index`
@@ -314,7 +314,7 @@ def _calculate_bond_features_tensor(rdkit_mol: Chem.Mol, pyg_edge_index: torch.T
                     raise StructuralFeatureError(
                         message=f"Unsupported bond feature requested: '{feature_name}'.",
                         molecule_index=molecule_index,
-                        inchi=inchi, # MODIFIED: smiles -> inchi
+                        inchi=inchi, 
                         feature_type="bond",
                         feature_name=feature_name,
                         reason="Invalid feature configuration.",
@@ -322,14 +322,14 @@ def _calculate_bond_features_tensor(rdkit_mol: Chem.Mol, pyg_edge_index: torch.T
                     )
             
             if single_bond_feature_length == 0:
-                logger.warning(f"[{molecule_index}, '{inchi}'] No valid bond features selected or they have 0 length. Defaulting to 1 for dummy feature length.") # MODIFIED: smiles -> inchi
+                logger.warning(f"[{molecule_index}, '{inchi}'] No valid bond features selected or they have 0 length. Defaulting to 1 for dummy feature length.") 
                 single_bond_feature_length = 1 
 
         except Exception as e:
             raise StructuralFeatureError(
                 message="Failed to determine expected bond feature vector length.",
                 molecule_index=molecule_index,
-                inchi=inchi, # MODIFIED: smiles -> inchi
+                inchi=inchi, 
                 feature_type="bond",
                 reason="Error during dummy bond processing or feature map lookup.",
                 detail=str(e)
@@ -358,7 +358,7 @@ def _calculate_bond_features_tensor(rdkit_mol: Chem.Mol, pyg_edge_index: torch.T
                     raise StructuralFeatureError(
                         message=f"Error calculating '{feature_name}' for bond between atoms {u}-{v}.",
                         molecule_index=molecule_index,
-                        inchi=inchi, # MODIFIED: smiles -> inchi
+                        inchi=inchi, 
                         feature_type="bond",
                         feature_name=feature_name,
                         reason=f"Failed to retrieve feature value for bond {i}.",
@@ -383,7 +383,7 @@ def _calculate_bond_features_tensor(rdkit_mol: Chem.Mol, pyg_edge_index: torch.T
         u, v = pyg_edge_index[0, i].item(), pyg_edge_index[1, i].item()
         features = rdkit_bond_features_dict.get((u, v))
         if features is None:
-            logger.warning(f"[{molecule_index}, '{inchi}'] No RDKit bond found for PyG edge ({u}, {v}). Assigning zeros to features.") # MODIFIED: smiles -> inchi
+            logger.warning(f"[{molecule_index}, '{inchi}'] No RDKit bond found for PyG edge ({u}, {v}). Assigning zeros to features.") 
             edge_features_list.append([0] * single_bond_feature_length)
         else:
             edge_features_list.append(features)
@@ -394,7 +394,7 @@ def _calculate_bond_features_tensor(rdkit_mol: Chem.Mol, pyg_edge_index: torch.T
         raise StructuralFeatureError(
             message="Failed to convert bond features to a PyTorch tensor.",
             molecule_index=molecule_index,
-            inchi=inchi, # MODIFIED: smiles -> inchi
+            inchi=inchi, 
             feature_type="bond",
             reason="Inconsistent feature vector lengths or invalid data.",
             detail=str(e)
@@ -408,7 +408,7 @@ def add_structural_features(
     feature_config: Dict,
     logger: logging.Logger,
     molecule_index: Optional[int] = None,
-    inchi: Optional[str] = None # MODIFIED: smiles -> inchi
+    inchi: Optional[str] = None 
 ) -> Data:
     """
     Adds atom-level (pyg_data.x) and bond-level (pyg_data.edge_attr) structural features
@@ -424,7 +424,7 @@ def add_structural_features(
         logger (logging.Logger): A logger instance for logging informational messages and warnings.
         molecule_index (Optional[int]): The index of the molecule in the dataset. Used for detailed error reporting.
                                         Defaults to None.
-        inchi (Optional[str]): The InChI string of the molecule. Used for detailed error reporting. # MODIFIED: smiles -> inchi
+        inchi (Optional[str]): The InChI string of the molecule. Used for detailed error reporting. 
                                Defaults to None.
 
     Returns:
@@ -440,14 +440,14 @@ def add_structural_features(
                                 RDKit errors during feature extraction, tensor conversion issues).
                                 This acts as a wrapper for more specific issues from helper functions.
     """
-    log_prefix = f"[Mol Index: {molecule_index}, InChI: '{inchi}']" if molecule_index is not None else "" # MODIFIED: SMILES -> InChI, smiles -> inchi
+    log_prefix = f"[Mol Index: {molecule_index}, InChI: '{inchi}']" if molecule_index is not None else "" 
 
     # Validate inputs
     if rdkit_mol is None:
         raise MoleculeProcessingError(
             message="RDKit molecule object is None.",
             molecule_index=molecule_index,
-            inchi=inchi, # MODIFIED: smiles -> inchi
+            inchi=inchi, 
             reason="Input 'rdkit_mol' is invalid.",
             detail="Cannot extract structural features from a non-existent molecule."
         )
@@ -455,7 +455,7 @@ def add_structural_features(
         raise PyGDataCreationError(
             message="PyTorch Geometric Data object is None.",
             molecule_index=molecule_index,
-            inchi=inchi, # MODIFIED: smiles -> inchi
+            inchi=inchi, 
             reason="Input 'pyg_data' is invalid.",
             detail="Cannot add structural features to a non-existent PyG Data object."
         )
@@ -483,14 +483,14 @@ def add_structural_features(
                     raise StructuralFeatureError(
                         message="Failed to determine atom feature dimension for empty molecule.",
                         molecule_index=molecule_index,
-                        inchi=inchi, # MODIFIED: smiles -> inchi
+                        inchi=inchi, 
                         feature_type="atom",
                         reason="Could not get feature dimension from dummy atom for empty molecule.",
                         detail=str(e)
                     ) from e
             else:
                 pyg_data.x = _calculate_atom_features_tensor(rdkit_mol, selected_atom_features,
-                                                               molecule_index=molecule_index, inchi=inchi) # MODIFIED: smiles -> inchi
+                                                               molecule_index=molecule_index, inchi=inchi) 
         else:
             logger.info(f"{log_prefix} No atom features configured to be added. Setting pyg_data.x to None.")
             pyg_data.x = None
@@ -498,7 +498,7 @@ def add_structural_features(
         # Calculate and assign bond features (pyg_data.edge_attr)
         if selected_bond_features and hasattr(pyg_data, 'edge_index') and pyg_data.edge_index.size(1) > 0:
             pyg_data.edge_attr = _calculate_bond_features_tensor(rdkit_mol, pyg_data.edge_index, selected_bond_features,
-                                                                 molecule_index=molecule_index, inchi=inchi) # MODIFIED: smiles -> inchi
+                                                                 molecule_index=molecule_index, inchi=inchi) 
         else:
             logger.info(f"{log_prefix} No bond features configured, no edge_index present, or no edges. Setting pyg_data.edge_attr to None.")
             pyg_data.edge_attr = None
@@ -512,7 +512,7 @@ def add_structural_features(
         raise StructuralFeatureError(
             message="An unexpected error occurred while adding structural features.",
             molecule_index=molecule_index,
-            inchi=inchi, # MODIFIED: smiles -> inchi
+            inchi=inchi, 
             reason="Unhandled exception during feature computation.",
             detail=str(e)
         ) from e

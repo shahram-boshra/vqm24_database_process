@@ -27,10 +27,10 @@ logger = logging.getLogger(__name__)
 def create_rdkit_mol(
     mol_identifier: str, # Can be SMILES or InChI
     coordinates: np.ndarray, # Renamed for clarity (was coords_np)
-    atomic_numbers: np.ndarray, # New: explicit atomic numbers for atom creation
+    atomic_numbers: np.ndarray, # Explicit atomic numbers for atom creation
     logger: logging.Logger,
     molecule_index: Optional[int] = None,
-    mol_id_type: str = 'smiles' # New: 'smiles' or 'inchi' to control logic
+    mol_id_type: str = 'smiles' # 'smiles' or 'inchi' to control logic
 ) -> Chem.Mol:
     """
     Creates an RDKit molecule from a SMILES string OR an InChI string,
@@ -103,7 +103,7 @@ def create_rdkit_mol(
                 detail=str(e)
             ) from e
 
-        # --- MODIFIED CODE BLOCK: Assign stereochemistry from 3D conformer (SMILES branch) ---
+        # --- Start Assign stereochemistry from 3D conformer (SMILES branch) ---
         try:
             # Remove any existing stereochemistry information inferred from the SMILES string.
             # This ensures the 3D coordinates are the single source of truth for stereochemistry.
@@ -119,10 +119,10 @@ def create_rdkit_mol(
             raise RDKitConversionError(
                 molecule_index=molecule_index,
                 inchi=mol_identifier, # Use inchi as identifier for logging consistency with InChI branch
-                reason=f"Failed to assign stereochemistry from 3D coordinates using Chem.AssignStereochemistryFrom3D for SMILES mol.", # <<< Corrected here
+                reason=f"Failed to assign stereochemistry from 3D coordinates using Chem.AssignStereochemistryFrom3D for SMILES mol.", 
                 detail=str(e)
             ) from e
-        # --- END MODIFIED CODE BLOCK ---
+        # --- END Assign stereochemistry from 3D conformer (SMILES branch) ---
 
         return mol
 
@@ -182,7 +182,7 @@ def create_rdkit_mol(
                 detail=str(e)
             ) from e
 
-        # --- MODIFIED CODE BLOCK: Assign stereochemistry from 3D conformer (InChI branch) ---
+        # --- Start Assign stereochemistry from 3D conformer (InChI branch) ---
         try:
             # Remove any existing stereochemistry information inferred from the InChI string,
             # as we are about to re-assign it from the QM-optimized 3D coordinates.
@@ -201,7 +201,7 @@ def create_rdkit_mol(
                 reason=f"Failed to assign stereochemistry from 3D coordinates using Chem.AssignStereochemistryFrom3D for InChI mol.", # <<< Corrected here
                 detail=str(e)
             ) from e
-        # --- END MODIFIED CODE BLOCK ---
+        # --- END Assign stereochemistry from 3D conformer (InChI branch) ---
 
         # 6. Final validation: Generate InChI from the constructed RDKit Mol and compare to input.
         try:

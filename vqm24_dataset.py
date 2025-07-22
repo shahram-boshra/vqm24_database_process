@@ -29,7 +29,7 @@ from torch.nn.utils.rnn import pad_sequence
 
 import multiprocessing
 
-from config import load_config
+from config import load_config, RAW_NPZ_DOWNLOAD_URL
 from data_utils import _is_value_valid_and_not_nan
 from mol_conversion import MoleculeDataConverter
 from molecule_filters import apply_pre_filters
@@ -126,95 +126,77 @@ class VQM24Dataset(InMemoryDataset):
         force_reload (bool, optional): If True, forces a re-download and re-processing of the dataset,
                                        even if processed files already exist. Defaults to False.
     """
-    ZENODO_DOWNLOAD_URL: str = "https://zenodo.org/records/15442257/files/DFT_all.npz?download=1"
 
     def __init__(self,
-                 root: str,
-                 npz_file_path: str,
-                 data_config: Dict[str, Any],
-                 filter_config: Dict[str, Any],
-                 structural_features_config: Dict[str, Any],
-                 logger: logging.Logger,
-                 chunk_size: int = 5000,
-                 transform: Optional[Any] = None, # Type depends on PyG transform
-                 pre_transform: Optional[Any] = None, # Type depends on PyG transform
-                 pre_filter: Optional[Any] = None, # Type depends on PyG filter
-                 pyg_pre_transforms_config: Optional[Dict[str, Any]] = None,
-                 force_reload: bool = False):
+                     root: str,
+                     npz_file_path: str,
+                     data_config: Dict[str, Any],
+                     filter_config: Dict[str, Any],
+                     structural_features_config: Dict[str, Any],
+                     logger: logging.Logger,
+                     chunk_size: int = 5000,
+                     transform: Optional[Any] = None, # Type depends on PyG transform
+                     pre_transform: Optional[Any] = None, # Type depends on PyG transform
+                     pre_filter: Optional[Any] = None, # Type depends on PyG filter
+                     pyg_pre_transforms_config: Optional[Dict[str, Any]] = None,
+                     force_reload: bool = False,
+                     raw_npz_download_url: Optional[str] = None
+                     ):
 
-        # Store only the filename, as the actual path will be downloaded
-        self.raw_data_filename: str = Path(npz_file_path).name # Store just the filename
-        self.data_config: Dict[str, Any] = data_config
-        self.filter_config: Dict[str, Any] = filter_config
-        self.structural_features_config: Dict[str, Any] = structural_features_config
-        self.logger: logging.Logger = logger
-        self.chunk_size: int = chunk_size
-        self.force_reload: bool = force_reload
-        self.processed_chunk_dir: Path = Path(root) / "processed_chunks"
+            self.logger: logging.Logger = logger
+            self.force_reload: bool = force_reload
+            self.pre_transform_pipeline: Optional[Compose] = self._initialize_pre_transforms(pyg_pre_transforms_config)
+            
+            # Store only the filename, as the actual path will be downloaded
+            self.raw_data_filename: str = Path(npz_file_path).name 
+            self.raw_npz_download_url = raw_npz_download_url
+            self.data_config: Dict[str, Any] = data_config
+            self.filter_config: Dict[str, Any] = filter_config
+            self.structural_features_config: Dict[str, Any] = structural_features_config
+            self.chunk_size: int = chunk_size
+            self.processed_chunk_dir: Path = Path(root) / "processed_chunks"
 
-        self.logger.info(f"Initializing VQM24Dataset with root: {root}, filters: {filter_config}, chunk_size: {chunk_size}")
-        self.pre_transform_pipeline: Optional[Compose] = self._initialize_pre_transforms(pyg_pre_transforms_config)
+            self.logger.info(f"Initializing VQM24Dataset with root: {root}, filters: {filter_config}, chunk_size: {chunk_size}")
+            
+            # Initialize parent class AFTER setting paths that depend on raw_dir/processed_dir
+            super().__init__(root, transform, pre_transform=self.pre_transform_pipeline, force_reload=self.force_reload)
 
-        # NOTE: torch.serialization.add_safe_globals is deprecated/removed in PyTorch 2.x and later.
-        # PyTorch Geometric Data objects are generally handled by PyTorch's default pickling
-        # mechanisms without needing explicit registration for standard use cases.
-        # If `torch.load` encounters issues with specific custom types within the
-        # serialized data, a more advanced custom deserialization strategy
-        # (e.g., using `dill` or custom `unpickler` in `torch.load`) might be needed.
-        # Removed the following block as it caused an AttributeError:
-        # safe_classes = [
-        #     np.dtype,
-        #     np.dtypes.StrDType, # These NumPy internal types might not exist or have changed in NumPy 2.x
-        #     np._core.multiarray.scalar, # These NumPy internal types might not exist or have changed in NumPy 2.x
-        #     torch_geometric.data.data.Data,
-        #     torch_geometric.data.data.DataEdgeAttr,
-        #     torch_geometric.data.data.DataTensorAttr,
-        #     torch_geometric.data.storage.GlobalStorage,
-        # ]
-        # if Compose is not None:
-        #     safe_classes.append(Compose)
-        # torch.serialization.add_safe_globals(safe_classes) # This line is the direct cause of the error
-        # self.logger.debug("Removed call to torch.serialization.add_safe_globals due to deprecation/removal.")
+            # The remaining part of __init__ which deals with loading processed_file_path
+            # should remain after super().__init__ because processed_paths[0] depends on super().__init__
+            processed_file_path: str = self.processed_paths[0]
+            if Path(processed_file_path).exists():
+                try:
+                    self.data: Optional[Data]
+                    self.slices: Optional[Dict[str, torch.Tensor]]
+                    self.data, self.slices = torch.load(processed_file_path)
+                    self.logger.info(f"Dataset data and slices loaded from {processed_file_path}.")
+                except Exception as e:
+                    self.logger.error(f"Error during manual load of {processed_file_path}: {e}")
+                    raise DataProcessingError(
+                        message=f"Failed to load processed dataset from {processed_file_path}.",
+                        details=f"Original error: {e.__class__.__name__}: {e}"
+                    ) from e
+            else:
+                self.logger.warning(f"Processed file {processed_file_path} does NOT exist after super().__init__. Processing might have failed to save it correctly, or all molecules were filtered out.")
+                self.data, self.slices = None, None
 
+            if isinstance(self.slices, dict) and self.slices:
+                first_slice_key = next(iter(self.slices))
+                inferred_len_from_slices = len(self.slices[first_slice_key])
+                self.logger.debug(f"Length inferred from first slice key ('{first_slice_key}'): {inferred_len_from_slices}")
+            else:
+                self.logger.debug("self.slices is not a dictionary or is empty, cannot infer length directly from slices.")
 
-        super().__init__(root, transform, pre_transform=self.pre_transform_pipeline, force_reload=self.force_reload)
-
-        processed_file_path: str = self.processed_paths[0]
-        if Path(processed_file_path).exists():
-            try:
-                self.data: Optional[Data]
-                self.slices: Optional[Dict[str, torch.Tensor]]
-                self.data, self.slices = torch.load(processed_file_path)
-                self.logger.info(f"Dataset data and slices loaded from {processed_file_path}.")
-            except Exception as e: # Catching generic Exception here as torch.load can raise various errors
-                self.logger.error(f"Error during manual load of {processed_file_path}: {e}")
-                # Raise a specific DataProcessingError to signal this issue
-                raise DataProcessingError(
-                    message=f"Failed to load processed dataset from {processed_file_path}.",
-                    details=f"Original error: {e.__class__.__name__}: {e}"
-                ) from e # Chain the exception for better debugging
-        else:
-            self.logger.warning(f"Processed file {processed_file_path} does NOT exist after super().__init__. Processing might have failed to save it correctly, or all molecules were filtered out.")
-            self.data, self.slices = None, None # It's okay for these to be None if no file was found, as process() will generate it.
-
-        if isinstance(self.slices, dict) and self.slices:
-            first_slice_key = next(iter(self.slices))
-            inferred_len_from_slices = len(self.slices[first_slice_key])
-            self.logger.debug(f"Length inferred from first slice key ('{first_slice_key}'): {inferred_len_from_slices}")
-        else:
-            self.logger.debug("self.slices is not a dictionary or is empty, cannot infer length directly from slices.")
-
-
-        if len(self) == 0:
-            self.logger.critical("Dataset is empty after processing/loading! Check errors during processing or if all molecules were filtered out.")
-            self.logger.warning("Dataset is empty after processing/loading. Refer to ERROR/WARNING logs for details.")
-        else:
-            self.logger.info(f"Dataset successfully loaded/processed. Total molecules: {len(self)}")
-            if hasattr(self.data, 'num_graphs'):
-                self.logger.debug(f"self.data.num_graphs: {self.data.num_graphs}")
-            elif isinstance(self.slices, dict) and self.slices:
-                num_graphs_inferred = len(next(iter(self.slices.values())))
-                self.logger.debug(f"Inferred number of graphs from slices: {num_graphs_inferred}")
+            if len(self) == 0:
+                self.logger.critical("Dataset is empty after processing/loading! Check errors during processing or if all molecules were filtered out.")
+                self.logger.warning("Dataset is empty after processing/loading. Refer to ERROR/WARNING logs for details.")
+            else:
+                self.logger.info(f"Dataset successfully loaded/processed. Total molecules: {len(self)}")
+                if hasattr(self.data, 'num_graphs'):
+                    self.logger.debug(f"self.data.num_graphs: {self.data.num_graphs}")
+                elif isinstance(self.slices, dict) and self.slices:
+                    num_graphs_inferred = len(next(iter(self.slices.values())))
+                    self.logger.debug(f"Inferred number of graphs from slices: {num_graphs_inferred}")
 
     def _initialize_pre_transforms(self, pyg_pre_transforms_config: Optional[Dict[str, Any]]) -> Optional[Compose]:
         """
@@ -412,12 +394,17 @@ class VQM24Dataset(InMemoryDataset):
                                         pbar.update(len(data))
                         except ModuleNotFoundError:
                             if logger:
-                                logger.warning("tqdm library not found, progress bar will not be shown.")
+                                logger.warning("tqdm library not found, progress bar will not be shown. Continuing download without progress bar.")
+                            # This part was the implicit fallback:
                             with open(destination_path, 'ab') as file:
                                 for data in response.iter_content(chunk_size=block_size):
                                     if data:
                                         file.write(data)
                                         downloaded += len(data)
+                        except Exception as e:
+                            raise IOError(f"Error writing downloaded data to file: {e}") from e # Re-raise as IOError
+
+
 
                     if downloaded >= total_size_in_bytes:
                         if logger:
@@ -441,6 +428,24 @@ class VQM24Dataset(InMemoryDataset):
                         logger.critical(f"Maximum number of retries reached. Unable to download '{filename}'.")
                     if os.path.exists(destination_path):
                         os.remove(destination_path)
+                    raise RequestException(f"Failed to download '{filename}' after {max_retries} retries.")
+
+            except IOError as e: # ADDED THIS BLOCK
+                if logger:
+                    logger.critical(f"IO Error during download or writing file: {e}")
+                if os.path.exists(destination_path):
+                    os.remove(destination_path) # Clean up partial file
+                raise # Re-raise IOError to indicate a critical file system issue
+            except Exception as e: # ADDED THIS BLOCK
+                if logger:
+                    logger.critical(f"An unexpected error occurred during download of '{filename}': {e}", exc_info=True)
+                if os.path.exists(destination_path):
+                    os.remove(destination_path)
+                raise DataProcessingError( # Re-raise as DataProcessingError for consistency
+                    message=f"An unexpected error occurred while downloading '{filename}'.",
+                    details=str(e)
+                ) from e
+                
 
     def process(self) -> None:
         """
@@ -476,7 +481,7 @@ class VQM24Dataset(InMemoryDataset):
         """
         self.logger.info("Starting VQM24Dataset processing (chunked mode)...")
 
-        raw_npz_path_for_processing: str = self.raw_paths[0]
+        raw_npz_path_for_processing: Path = Path(self.raw_paths[0])
 
         self.logger.info(f"Pre-loading required arrays from {raw_npz_path_for_processing} into memory (mmap_mode='r')...")
         preloaded_data: Dict[str, np.ndarray] = {}
@@ -497,8 +502,8 @@ class VQM24Dataset(InMemoryDataset):
 
         try:
             with np.load(raw_npz_path_for_processing, allow_pickle=True, mmap_mode='r') as data:
-                # Use 'graphs' to determine total count, as confirmed by test_npzkeys.py
-                total_molecules: int = data['graphs'].shape[0]
+                # Use 'inchi' to determine total count
+                total_molecules: int = data['inchi'].shape[0]
                 test_molecule_limit: Optional[int] = self.data_config.get('test_molecule_limit')
                 if test_molecule_limit is not None and test_molecule_limit > 0:
                     total_molecules = min(total_molecules, test_molecule_limit)
@@ -556,9 +561,7 @@ class VQM24Dataset(InMemoryDataset):
                 # Renamed from original_smiles to original_inchi for accuracy in logs.
                 original_inchi_for_log = raw_properties_dict_for_current_mol.get('inchi', 'N/A')
                 if original_inchi_for_log is None or original_inchi_for_log == 'N/A':
-                    # Fallback if 'inchi' is somehow missing, use 'graphs' as a last resort
-                    original_inchi_for_log = str(raw_properties_dict_for_current_mol.get('graphs', 'N/A'))
-                    self.logger.debug(f"Molecule {i}: 'inchi' not found for logging, falling back to 'graphs' for InChI representation.")
+                    original_inchi_for_log = "N/A (inchi missing for logging, no fallback)"
                 else:
                     original_inchi_for_log = str(original_inchi_for_log) # Ensure it's a string
 

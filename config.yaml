@@ -1,6 +1,21 @@
 # config.yaml
 
 
+# Dataset Configuration
+dataset_config:
+  # Filename for the raw .npz dataset file
+  raw_npz_filename: DFT_all.npz
+
+  # URL to download the raw .npz dataset file.
+  # Set to null if the dataset is expected to be present locally and not downloaded.
+  raw_npz_download_url: https://zenodo.org/records/15442257/files/DFT_all.npz?download=1
+
+  # Root directory where the processed PyTorch Geometric dataset will be stored.
+  # Paths starting with '~' will be expanded to the user's home directory.
+  # Example: ~/Chem_Data/VQM24_PyG_Dataset
+  dataset_root_dir: ~/Chem_Data/VQM24_PyG_Dataset
+
+
 global_constants: # Global Constants for Hartree to eV conversion factor, atomization energy calculation and heavy atom filtering
   har2ev: 27.211386245988
 
@@ -75,9 +90,9 @@ data_config:
   # The name of the key for the calculated atomization energy (will be appended to pyg_data.y)
   atomization_energy_key_name: Etot_ATOM
 
-  test_molecule_limit: 100 # Set to a specific number to limit processing for testing, or null/remove for full dataset
+  #test_molecule_limit: 100 # Set to a specific number to limit processing for testing, or null/remove for full dataset
 
-  vibration_refinement: # <--- ADD THIS SECTION
+  vibration_refinement: 
     comparison_tolerance: 1.0e-4 # Tolerance for numerical comparisons when refining freqs and vibmodes
 
 

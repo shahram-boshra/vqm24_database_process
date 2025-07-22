@@ -61,6 +61,7 @@ def _is_value_valid_and_not_nan(value, allow_empty_array: bool = False) -> bool:
             return False
     return False
 
+
 def _deep_convert_to_float(item: Any) -> Union[float, List[float], None]:
     """
     Recursively converts elements of a nested list/array structure to float.
@@ -83,6 +84,7 @@ def _deep_convert_to_float(item: Any) -> Union[float, List[float], None]:
         logger.warning(f"Unsupported type encountered during deep conversion to float: {type(item).__name__} with value '{item}'. Returning None.")
         return None
 
+
 def _flatten_list_if_nested(input_list: List[Any]) -> List[float]:
     """
     Flattens a list of lists into a single list of floats.
@@ -98,6 +100,7 @@ def _flatten_list_if_nested(input_list: List[Any]) -> List[float]:
         else:
             logger.warning(f"Non-numeric item encountered during flattening: {type(item).__name__} = {item}")
     return flattened
+
 
 def _normalize_vibmode(vibmode_entry: Any, molecule_index: int = -1) -> np.ndarray:
     """

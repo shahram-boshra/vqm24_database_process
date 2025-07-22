@@ -18,7 +18,7 @@ from typing import Dict, Any, Union, List
 
 import numpy as np
 import torch
-from torch_geometric.data import Data, InMemoryDataset # InMemoryDataset for dataset type
+from torch_geometric.data import Data, InMemoryDataset 
 from tqdm import tqdm
 
 try:
@@ -26,7 +26,7 @@ try:
 except ImportError:
     Compose = None
 
-from config import load_config
+from config import load_config, RAW_NPZ_FILENAME, DATASET_ROOT_DIR 
 from logging_config import setup_logging
 from vqm24_dataset import VQM24Dataset
 
@@ -327,9 +327,14 @@ def main() -> None:
         'transforms': full_config.get('transformations', [])
     }
 
-    raw_npz_filename: str = "DFT_all.npz"
-    dataset_root_dir: Path = Path.home() / "Chem_Data" / "VQM24_PyG_Dataset"
+    # Retrieve paths from config
+    raw_npz_filename: str = RAW_NPZ_FILENAME # Get from config module
+    # Path handling: Expand user (~), convert to absolute path, then ensure directory exists
+    dataset_root_dir: Path = Path(DATASET_ROOT_DIR).expanduser().resolve()
     dataset_root_dir.mkdir(parents=True, exist_ok=True)
+    logger.info(f"Using dataset root directory: {dataset_root_dir}")
+    logger.info(f"Expecting raw NPZ filename: {raw_npz_filename}")
+
 
     try:
         dataset = VQM24Dataset(root=str(dataset_root_dir),

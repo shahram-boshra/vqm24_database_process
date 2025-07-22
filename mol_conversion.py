@@ -10,7 +10,7 @@ Handles various exceptions during the conversion process for robust data pipelin
 import logging
 import numpy as np
 from rdkit import Chem
-from rdkit.Chem import AllChem # AllChem is imported but not directly used in the provided snippet
+from rdkit.Chem import AllChem 
 from torch_geometric.data import Data
 from typing import Dict, Optional, Union, Any
 
@@ -110,6 +110,48 @@ class MoleculeDataConverter:
                 current_mol_identifier = str(mol_identifier)
             # If mol_identifier is None, current_mol_identifier remains "N/A (unknown)" which is appropriate for the error.
 
+            # --- START 'rots' Property Homogenization ---
+            # Ensure 'rots' is a NumPy array, even if it was originally a Python list within the object dtype array
+            if 'rots' in raw_properties_dict:
+                rots_data = raw_properties_dict['rots']
+                if isinstance(rots_data, list):
+                    try:
+                        # Attempt to convert the list to a NumPy array of float
+                        raw_properties_dict['rots'] = np.array(rots_data, dtype=float)
+                        self.logger.debug(
+                            f"Molecule {current_mol_index} (ID: {current_mol_identifier}): Converted 'rots' from list to numpy array for consistency."
+                        )
+                    except ValueError as e:
+                        self.logger.error(
+                            f"Molecule {current_mol_index} (ID: {current_mol_identifier}): Failed to convert 'rots' list to numpy array. Skipping molecule. Error: {e}"
+                        )
+                        # Raise a specific error to be caught by the outer try-except,
+                        # ensuring this molecule is properly skipped in the dataset processing.
+                        raise PropertyEnrichmentError(
+                            molecule_index=current_mol_index,
+                            inchi=current_mol_identifier,
+                            reason="Failed to convert 'rots' list to numeric NumPy array.",
+                            detail=str(e)
+                        )
+                elif not isinstance(rots_data, np.ndarray):
+                     # Handle cases where 'rots' might be something unexpected but not a list or numpy array
+                     self.logger.warning(
+                        f"Molecule {current_mol_index} (ID: {current_mol_identifier}): 'rots' property is neither a list nor a numpy array (actual type: {type(rots_data)}). Attempting conversion anyway."
+                     )
+                     try:
+                        raw_properties_dict['rots'] = np.array(rots_data, dtype=float)
+                     except ValueError as e:
+                        self.logger.error(
+                            f"Molecule {current_mol_index} (ID: {current_mol_identifier}): Failed to convert unexpected 'rots' type to numpy array. Skipping molecule. Error: {e}"
+                        )
+                        raise PropertyEnrichmentError(
+                            molecule_index=current_mol_index,
+                            inchi=current_mol_identifier,
+                            reason="Unexpected 'rots' data type. Failed to convert to numeric NumPy array.",
+                            detail=str(e)
+                        )
+            # --- END 'rots' Property Homogenization ---
+
             # Validate essential inputs
             if mol_identifier is None:
                 raise RDKitConversionError(
@@ -153,7 +195,7 @@ class MoleculeDataConverter:
             pyg_data: Data = mol_to_pyg_data(rdkit_mol, self.logger,
                                              molecule_index=current_mol_index, inchi=current_mol_identifier) # Changed to inchi
 
-            # --- START NEW CODE BLOCK: Add structural features ---
+            # --- START Add structural features ---
             # Get the configuration for structural features from the main config
             structural_features_config = self.structural_features_config
 
@@ -172,7 +214,7 @@ class MoleculeDataConverter:
                 # Ensure x and edge_attr are set to None if no features are added
                 pyg_data.x = None
                 pyg_data.edge_attr = None
-            # --- END NEW CODE BLOCK ---
+            # --- END Add structural features ---
 
             # Attach identifier and original_mol_idx to pyg_data for better debugging downstream
             # Store the primary identifier in 'inchi' if it was InChI, otherwise in 'smiles'
