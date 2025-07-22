@@ -50,7 +50,7 @@ This repository provides a robust and configurable data processing pipeline for 
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/vqm24-pytorch-geometric.git
+git clone https://github.com/shahram-boshra/vqm24-pytorch-geometric.git
 cd vqm24-pytorch-geometric
 
 # Create conda environment
@@ -273,7 +273,7 @@ We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.
 
 ```bash
 # Fork and clone the repository
-git clone https://github.com/yourusername/vqm24-pytorch-geometric.git
+git clone https://github.com/shahram-boshra/vqm24-pytorch-geometric.git
 
 # Create development environment
 conda env create -f environment.yml
