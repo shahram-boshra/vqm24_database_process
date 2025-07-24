@@ -7,7 +7,7 @@
 
 ## Overview
 
-This repository provides a robust and configurable data processing pipeline for the **VQM24 (Virtual Quantum Mechanical Property Prediction)** dataset, specifically designed for use with **PyTorch Geometric (PyG)**. The pipeline handles the entire workflow from raw data acquisition to creating production-ready `torch_geometric.data.Data` objects with comprehensive molecular features and properties.
+This repository provides a robust and configurable data processing pipeline for the **VQM24 (Vector Quantum Mechanical Property Prediction)** dataset, specifically designed for use with **PyTorch Geometric (PyG)**. The pipeline handles the entire workflow from raw data acquisition to creating production-ready `torch_geometric.data.Data` objects with comprehensive molecular features and properties.
 
 ## Table of Contents
 
