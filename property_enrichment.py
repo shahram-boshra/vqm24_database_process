@@ -23,7 +23,7 @@ from torch_geometric.data import Data
 
 from config import HAR2EV, ATOMIC_ENERGIES_HARTREE
 from data_utils import _is_value_valid_and_not_nan
-from data_refining import refine_molecular_vibrations
+from data_refining import refine_molecular_vibrations, log_vibration_refinement_status
 from exceptions import PropertyEnrichmentError, ConfigurationError
 
 
@@ -447,7 +447,7 @@ def add_variable_len_graph_properties(
                 detail=str(e)
             ) from e
     else:
-        logger.info(f"Molecule {molecule_index}: Skipping vibrational data refinement as 'freqs' or 'vibmodes' are missing/invalid in raw data.")
+        log_vibration_refinement_status(raw_freqs_data=raw_freqs_data, raw_vibmodes_data=raw_vibmodes_data, molecule_index=molecule_index, logger=logger)
 
 
     # Now iterate through the property_keys, and for 'freqs' and 'vibmodes',

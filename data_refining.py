@@ -181,6 +181,27 @@ def _normalize_vibmode(vibmode_entry: Any, molecule_index: int = -1) -> np.ndarr
 
     return normalized_vibmode
 
+def log_vibration_refinement_status(
+    raw_freqs_data: Any,
+    raw_vibmodes_data: Any,
+    molecule_index: int,
+    logger: logging.Logger
+) -> None:
+    """
+    Logs the status of vibrational data refinement based on the availability of
+    frequencies and vibrational modes in the raw data.
+    """
+    freqs_available = raw_freqs_data is not None
+    vibmodes_available = raw_vibmodes_data is not None
+
+    if not freqs_available and not vibmodes_available:
+        logger.info(f"Molecule {molecule_index}: Skipping vibrational data refinement: 'freqs' and 'vibmodes' are both not chosen to be processed.")
+    elif not freqs_available:
+        logger.info(f"Molecule {molecule_index}: Skipping vibrational frequencies data refinement: 'freqs' is not not chosen to be processed.")
+    elif not vibmodes_available:
+        logger.info(f"Molecule {molecule_index}: Skipping vibrational modes data refinement: 'vibmodes' is not chosen to be processed.")
+    else:
+        pass
 
 def refine_molecular_vibrations(freqs: np.ndarray, vibmodes: np.ndarray, comparison_tolerance: float = 1e-4, molecule_index: int = -1):
     """
@@ -212,16 +233,6 @@ def refine_molecular_vibrations(freqs: np.ndarray, vibmodes: np.ndarray, compari
         VibrationRefinementError: If no valid frequency-vibmode pairs are found,
                                   or if there's a mismatch in the counts after refinement.
     """
-    logger.debug(f"DEBUG (data_refining): Molecule {molecule_index} - Raw Input to refine_molecular_vibrations:")
-    logger.debug(f"  Freqs Shape: {freqs.shape if isinstance(freqs, np.ndarray) else 'N/A'}, Vibmodes Type: {type(vibmodes)}")
-    logger.debug(f"  First 5 Freqs: {freqs[:5] if isinstance(freqs, np.ndarray) and freqs.size > 0 else 'N/A'}")
-    if isinstance(vibmodes, np.ndarray) and vibmodes.size > 0:
-        logger.debug(f"  First Vibmode Entry Type (raw): {type(vibmodes[0])}")
-        logger.debug(f"  First Vibmode Entry Shape (raw): {vibmodes[0].shape if isinstance(vibmodes[0], np.ndarray) else 'N/A'}")
-    else:
-        logger.debug("  Vibmodes array is empty or not a numpy array.")
-
-
     # Step 1: Remove empty or near-zero frequencies and their corresponding vibmodes
     # Also filter out vibmodes that cannot be normalized
     cleaned_freqs = []
@@ -273,22 +284,6 @@ def refine_molecular_vibrations(freqs: np.ndarray, vibmodes: np.ndarray, compari
 
     # Step 3: Determine acceptance based on count parity and log
     is_accepted = (len(final_unique_freqs) == len(final_unique_vibmodes))
-
-    # --- DEBUGGING BLOCK ---
-    # Log for the first 5 molecules or if molecule_index is not provided (-1)
-    if molecule_index == -1 or molecule_index < 5:
-        log_prefix = f"DEBUG (data_refining): Molecule {molecule_index}" if molecule_index != -1 else "DEBUG (data_refining): Molecule (index not provided)"
-        logger.info(f"{log_prefix} - Refined Output:")
-        logger.info(f"  is_accepted: {is_accepted}")
-        logger.info(f"  Cleaned Frequencies Count: {len(final_unique_freqs)}")
-        logger.info(f"  Cleaned Vibmodes Count: {len(final_unique_vibmodes)}")
-        if final_unique_freqs:
-            logger.info(f"  First 5 Cleaned Freqs: {[f'{f:.4f}' for f in final_unique_freqs[:5]]}")
-        if final_unique_vibmodes:
-            logger.info(f"  First Cleaned Vibmode Type: {type(final_unique_vibmodes[0])}")
-            if isinstance(final_unique_vibmodes[0], np.ndarray):
-                 logger.info(f"  First Cleaned Vibmode Shape: {final_unique_vibmodes[0].shape}")
-    # --- END DEBUGGING BLOCK ---
 
     if is_accepted:
         logger.info(f"Molecule {molecule_index}: Refinement complete: Accepted. Number of unique freqs = {len(final_unique_freqs)}, Number of unique vibmodes = {len(final_unique_vibmodes)}")

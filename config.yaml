@@ -44,7 +44,6 @@ heavy_atom_symbols_to_z:
   S: 16
   Si: 14
 
-# --- SECTION FOR STRUCTURAL FEATURES ---
 structural_features:
   atom:
     - degree
@@ -82,7 +81,7 @@ data_config:
     - hexadecapole
     - rots
   # Variable-length graph properties to be added as separate attributes (handled as lists of tensors)
-  variable_len_graph_properties_to_include:
+  variable_len_graph_properties_to_include: #[]
     - freqs
     - vibmodes
   # The key from which to calculate atomization energy (e.g., 'Etot')
